@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Live</title>
+<title>Depot Scheme Validator — Live (robust)</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -14,7 +14,7 @@
   }
   html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#0f172a;background:var(--bg)}
   .container{max-width:1200px;margin:28px auto;padding:20px}
-  header{display:flex;align-items:center;justify-content:space-between}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
   h1{font-size:22px;margin:0}
   .sub{color:var(--muted);font-size:13px}
   .tabs{display:flex;gap:8px;margin-top:18px}
@@ -30,10 +30,13 @@
   th,td{padding:10px;border-bottom:1px solid rgba(13,23,40,0.04);text-align:left}
   th{color:var(--muted);font-weight:600;font-size:13px}
   .small{font-size:13px;color:var(--muted)}
-  /* grid now allows 5 columns but will wrap on small screens */
   .alloc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--gap);align-items:end;width:100%}
   .alloc-grid .full-row{grid-column:1/-1;display:flex;justify-content:center;margin-top:10px}
   .footer-brand{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#eef2ff,#f0fdfa)}
+  .status { font-size:13px; padding:6px 10px; border-radius:10px; background:rgba(11,17,26,0.03); }
+  .status.ok { color: #065f46; background: rgba(6,95,70,0.06); }
+  .status.warn { color:#854d0e; background: rgba(245,158,11,0.06); }
+  .status.err { color:#7f1d1d; background: rgba(239,68,68,0.06); }
   @media (max-width:900px){ .alloc-grid{grid-template-columns:1fr 1fr} }
 </style>
 </head>
@@ -42,9 +45,12 @@
   <header>
     <div>
       <h1>Depot Scheme Validator</h1>
-      <div class="sub">Gowtham Projects — Quick add with quantity in form (edit allocation to change qty)</div>
+      <div class="sub">Gowtham Projects — Live / Local (robust)</div>
     </div>
-    <div class="small">Client-only · Live</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div id="firebaseStatusBadge" class="status">Local-only</div>
+      <div class="small">Client app</div>
+    </div>
   </header>
 
   <div class="tabs" role="tablist">
@@ -111,7 +117,7 @@
       </div>
     </div>
 
-    <div style="margin-top:12px" class="small">Allocations persist in localStorage. Use Edit to change allocated quantity later.</div>
+    <div style="margin-top:12px" class="small">Allocations persist in localStorage and (if available) Firebase Realtime DB.</div>
 
     <table id="allocTable" style="margin-top:14px">
       <thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>RO No</th><th>Allocated</th><th>Issued</th><th>Balance</th><th>Last Issued</th><th>Remarks</th><th>Actions</th></tr></thead>
@@ -173,13 +179,13 @@
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-<!-- Firebase compat SDKs for plain HTML -->
+<!-- Firebase compat SDKs (optional) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
 
 <script>
-/* ---------- Firebase config (you provided) ---------- */
+/* ---------- Firebase config (your config) ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
   authDomain: "depot-validator-live.firebaseapp.com",
@@ -201,21 +207,26 @@ let lastFlagged = [];
 let firebaseApp = null;
 let firebaseDb = null;
 let firebaseConnected = false;
-// When pulling from firebase we suppress pushing local back immediately
 let suppressPushOnce = false;
 
 /* ---------- Helpers ---------- */
+function updateStatusBadge(type, text){
+  const el = document.getElementById('firebaseStatusBadge');
+  el.className = 'status ' + (type || '');
+  el.innerText = text || '';
+}
+function safeLog(...args){ try{ console.log(...args); } catch(e){} }
+
 function loadDataLists(){ const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : {depots:[], schemes:[]}; }
-function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && !suppressPushOnce) pushDataListsToFirebase(); suppressPushOnce = false; }
+function saveDataLists(){ try{ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); } catch(e){ console.warn('saveDataLists failed', e); } if (firebaseConnected && !suppressPushOnce) pushDataListsToFirebase(); suppressPushOnce = false; }
 function loadAllocations(){ const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:Number(a.allocated||0), issued:Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); }
-function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && !suppressPushOnce) pushAllocationsToFirebase(); suppressPushOnce = false; }
+function saveAllocations(){ try{ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); } catch(e){ console.warn('saveAllocations failed', e); } if (firebaseConnected && !suppressPushOnce) pushAllocationsToFirebase(); suppressPushOnce = false; }
 function toNumber(v){ if (v===null||v===undefined) return 0; const n = Number(String(v).replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 function normStr(s){ if (s===null||s===undefined) return ''; return String(s).replace(/\u00A0/g,' ').trim().replace(/\s+/g,' '); }
 function esc(s){ return s===undefined||s===null?'':String(s).replace(/[&<>"'`]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[m]); }
 
-/* ---------- XLSM / deterministic off-take extraction (commodity aware) ---------- */
+/* ---------- XLSM offtake extraction (commodity aware) ---------- */
 function colIndexToLetter(index){ let s=''; let i=index; while(i>=0){ s = String.fromCharCode((i%26)+65) + s; i = Math.floor(i/26) - 1; } return s; }
-
 function parseXlsmOfftake(wb){
   const first = wb.SheetNames[0];
   const ws = wb.Sheets[first];
@@ -279,7 +290,6 @@ function parseXmlStringToRecords(xmlString){
   }).filter(r => Object.keys(r).length > 0);
   return recs;
 }
-
 function readFileToJson(file){
   return new Promise((resolve,reject) => {
     const name = (file.name || '').toLowerCase();
@@ -373,117 +383,118 @@ function findKey(keys,cands){ const low = keys.map(k=>k.toLowerCase()); for (con
 document.getElementById('portalFile').addEventListener('change', (e)=>{ const f = e.target.files[0]; document.getElementById('portalFileName').innerText = f ? f.name : ''; });
 
 document.getElementById('validateBtn').addEventListener('click', async ()=> {
-  const f = document.getElementById('portalFile').files[0];
-  if (!f) return alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)');
+  const btn = document.getElementById('validateBtn');
+  btn.disabled = true;
+  const status = document.getElementById('validateStatus'); status.innerText = 'Extracting data from file...';
+  try {
+    const f = document.getElementById('portalFile').files[0];
+    if (!f) { alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)'); return; }
+    let rows;
+    try { rows = await readFileToJson(f); } catch(err){ console.error('Read failed', err); alert('Read failed: ' + (err && err.message ? err.message : 'unknown')); status.innerText=''; return; }
+    if (!rows || rows.length === 0) { alert('No rows extracted'); status.innerText=''; return; }
 
-  document.getElementById('validateStatus').innerText = 'Extracting data from file...';
-  let rows;
-  try { rows = await readFileToJson(f); } catch(err){ console.error(err); alert('Read failed: ' + (err && err.message ? err.message : 'unknown')); document.getElementById('validateStatus').innerText=''; return; }
-  if (!rows || rows.length === 0) { alert('No rows extracted'); document.getElementById('validateStatus').innerText=''; return; }
-
-  // Determine keys
-  let depotKey, schemeKey, qtyKey, commodityKey;
-  if (f.name.toLowerCase().endsWith('.xlsm') || (rows[0].hasOwnProperty('depot') && rows[0].hasOwnProperty('scheme') && rows[0].hasOwnProperty('issued_amount'))) {
-    depotKey = 'depot'; schemeKey = 'scheme'; qtyKey = 'issued_amount';
-    if (rows[0].hasOwnProperty('commodity')) commodityKey = 'commodity';
-  } else {
-    const keys = Object.keys(rows[0]);
-    depotKey = findKey(keys, ['depot','depotname','depot_name']);
-    schemeKey = findKey(keys, ['scheme','schemename','scheme_name']);
-    qtyKey = findKey(keys, ['issued_amount','issued','qty','quantity','amount','lifted','liftedquantity']);
-    commodityKey = findKey(keys, ['commodity','commodityname','commodity_name','comm']);
-  }
-
-  if (!depotKey || !schemeKey || !qtyKey) {
-    alert('File must contain Depot, Scheme and Issued/Quantity fields (could not detect automatically).');
-    document.getElementById('validateStatus').innerText = 'Key detection failed.';
-    return;
-  }
-
-  // perform strict matching and FIFO apply
-  loadAllocations();
-  const applied = [], flagged = [];
-  const useDate = document.getElementById('dateBehavior').value === 'useDate';
-  const nowISO = new Date().toISOString();
-  const lastIssuedMap = {};
-
-  for (const rec of rows) {
-    const rawDepot = normStr(rec[depotKey] ?? '');
-    const rawScheme = normStr(rec[schemeKey] ?? '');
-    const rawQty = toNumber(rec[qtyKey]);
-    const rawCommodity = commodityKey ? normStr(rec[commodityKey] ?? '') : '';
-
-    if (!rawDepot || !rawScheme) continue;
-    if (rawQty === 0) continue;
-
-    // Strict match: require commodity match if extracted commodity is non-empty
-    let matches = allocations.map((a, idx) => ({ ...a, __idx: idx }))
-      .filter(x => x.depot === rawDepot && x.scheme === rawScheme);
-
-    if (rawCommodity) {
-      matches = matches.filter(x => String(x.commodity || '').toLowerCase() === String(rawCommodity || '').toLowerCase());
-    }
-
-    if (!matches || matches.length === 0) {
-      // no allocation for this depot+scheme(+commodity) -> flagged
-      const reason = rawCommodity ? 'No allocation for depot+scheme+commodity' : 'No allocation for depot+scheme';
-      flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, reason });
-      continue;
-    }
-
-    // sort matches by numeric RO if possible, else insertion order
-    matches.sort((a,b) => {
-      const na = Number(a.ro), nb = Number(b.ro);
-      if (!isNaN(na) && !isNaN(nb)) return na - nb;
-      if (!isNaN(na) && isNaN(nb)) return -1;
-      if (isNaN(na) && !isNaN(nb)) return 1;
-      return a.__idx - b.__idx;
-    });
-
-    let remaining = rawQty;
-    for (const m of matches) {
-      if (remaining <= 0) break;
-      const idx = m.__idx;
-      const alloc = allocations[idx];
-      const avail = toNumber(alloc.allocated) - toNumber(alloc.issued);
-      if (avail <= 0) continue;
-      const consume = Math.min(avail, remaining);
-      allocations[idx].issued = toNumber(allocations[idx].issued) + consume;
-      // record lastIssued using rec.date if requested otherwise now
-      const ts = useDate && rec.date ? rec.date : nowISO;
-      lastIssuedMap[idx] = ts;
-      remaining -= consume;
-    }
-
-    if (remaining > 0) {
-      flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, leftover: remaining, reason: `Issued ${rawQty} exceeded available by ${remaining}` });
+    // Detect keys
+    let depotKey, schemeKey, qtyKey, commodityKey;
+    if (f.name.toLowerCase().endsWith('.xlsm') || (rows[0].hasOwnProperty('depot') && rows[0].hasOwnProperty('scheme') && rows[0].hasOwnProperty('issued_amount'))) {
+      depotKey = 'depot'; schemeKey = 'scheme'; qtyKey = 'issued_amount';
+      if (rows[0].hasOwnProperty('commodity')) commodityKey = 'commodity';
     } else {
-      applied.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty });
+      const keys = Object.keys(rows[0]);
+      depotKey = findKey(keys, ['depot','depotname','depot_name']);
+      schemeKey = findKey(keys, ['scheme','schemename','scheme_name']);
+      qtyKey = findKey(keys, ['issued_amount','issued','qty','quantity','amount','lifted','liftedquantity']);
+      commodityKey = findKey(keys, ['commodity','commodityname','commodity_name','comm']);
     }
+
+    if (!depotKey || !schemeKey || !qtyKey) {
+      alert('File must contain Depot, Scheme and Issued/Quantity fields (could not detect automatically).');
+      status.innerText = 'Key detection failed.';
+      return;
+    }
+
+    // perform strict matching and FIFO apply
+    loadAllocations();
+    const applied = [], flagged = [];
+    const useDate = document.getElementById('dateBehavior').value === 'useDate';
+    const nowISO = new Date().toISOString();
+    const lastIssuedMap = {};
+
+    for (const rec of rows) {
+      const rawDepot = normStr(rec[depotKey] ?? '');
+      const rawScheme = normStr(rec[schemeKey] ?? '');
+      const rawQty = toNumber(rec[qtyKey]);
+      const rawCommodity = commodityKey ? normStr(rec[commodityKey] ?? '') : '';
+
+      if (!rawDepot || !rawScheme) continue;
+      if (rawQty === 0) continue;
+
+      let matches = allocations.map((a, idx) => ({ ...a, __idx: idx }))
+        .filter(x => x.depot === rawDepot && x.scheme === rawScheme);
+
+      if (rawCommodity) {
+        matches = matches.filter(x => String(x.commodity || '').toLowerCase() === String(rawCommodity || '').toLowerCase());
+      }
+
+      if (!matches || matches.length === 0) {
+        const reason = rawCommodity ? 'No allocation for depot+scheme+commodity' : 'No allocation for depot+scheme';
+        flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, reason });
+        continue;
+      }
+
+      matches.sort((a,b) => {
+        const na = Number(a.ro), nb = Number(b.ro);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        if (!isNaN(na) && isNaN(nb)) return -1;
+        if (isNaN(na) && !isNaN(nb)) return 1;
+        return a.__idx - b.__idx;
+      });
+
+      let remaining = rawQty;
+      for (const m of matches) {
+        if (remaining <= 0) break;
+        const idx = m.__idx;
+        const alloc = allocations[idx];
+        const avail = toNumber(alloc.allocated) - toNumber(alloc.issued);
+        if (avail <= 0) continue;
+        const consume = Math.min(avail, remaining);
+        allocations[idx].issued = toNumber(allocations[idx].issued) + consume;
+        const ts = useDate && rec.date ? rec.date : nowISO;
+        lastIssuedMap[idx] = ts;
+        remaining -= consume;
+      }
+
+      if (remaining > 0) {
+        flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, leftover: remaining, reason: `Issued ${rawQty} exceeded available by ${remaining}` });
+      } else {
+        applied.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty });
+      }
+    }
+
+    // Post-process allocations
+    for (let i=0;i<allocations.length;i++){
+      const a = allocations[i];
+      if (toNumber(a.issued) >= toNumber(a.allocated)) {
+        a.issued = toNumber(a.allocated);
+        a.remarks = a.allocated > 0 ? 'RO Completed' : a.remarks || '';
+      } else if (toNumber(a.issued) > 0) {
+        a.remarks = 'Partially used';
+      } else {
+        a.remarks = '';
+      }
+      if (lastIssuedMap[i]) a.lastIssued = lastIssuedMap[i];
+    }
+
+    saveAllocations();
+    lastFlagged = flagged;
+    status.innerText = `Done. Applied: ${applied.length}, Flagged: ${flagged.length}`;
+    document.getElementById('downloadFlagged').disabled = flagged.length === 0;
+    renderAllocTable(); renderFlagged(); renderReport();
+  } catch (err) {
+    console.error('Validation error', err);
+    document.getElementById('validateStatus').innerText = 'Validation failed: ' + (err && err.message ? err.message : String(err));
+  } finally {
+    btn.disabled = false;
   }
-
-  // Post-process allocations: cap issued to allocated, update remarks and lastIssued
-  for (let i=0;i<allocations.length;i++){
-    const a = allocations[i];
-    if (toNumber(a.issued) >= toNumber(a.allocated)) {
-      a.issued = toNumber(a.allocated);
-      a.remarks = a.allocated > 0 ? 'RO Completed' : a.remarks || '';
-    } else if (toNumber(a.issued) > 0) {
-      a.remarks = 'Partially used';
-    } else {
-      a.remarks = '';
-    }
-    if (lastIssuedMap[i]) {
-      a.lastIssued = lastIssuedMap[i];
-    }
-  }
-
-  saveAllocations();
-
-  lastFlagged = flagged;
-  document.getElementById('validateStatus').innerText = `Done. Applied: ${applied.length}, Flagged: ${flagged.length}`;
-  document.getElementById('downloadFlagged').disabled = flagged.length === 0;
-  renderAllocTable(); renderFlagged(); renderReport();
 });
 
 /* ---------- UI render & wiring ---------- */
@@ -506,7 +517,11 @@ function renderDataLists(){
 
 document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newDepot').value); if(!v) return alert('Type depot name'); if(!dataLists.depots.includes(v)) dataLists.depots.push(v); document.getElementById('newDepot').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
-document.addEventListener('click', (e)=>{ if (e.target.matches('.del-depot')){ const i = Number(e.target.dataset.idx); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); } if (e.target.matches('.del-scheme')){ const i = Number(e.target.dataset.idx); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); } });
+
+document.addEventListener('click', (e)=>{ 
+  if (e.target.matches('.del-depot')){ const i = Number(e.target.dataset.idx); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+  if (e.target.matches('.del-scheme')){ const i = Number(e.target.dataset.idx); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+});
 
 document.getElementById('addAllocBtn').addEventListener('click', ()=> {
   const depot = document.getElementById('depotSelect').value;
@@ -539,7 +554,6 @@ function renderAllocTable(){
   // actions
   document.querySelectorAll('.del-alloc').forEach(b=>b.onclick = (e)=>{ const i = Number(e.target.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); });
   document.querySelectorAll('.edit-alloc').forEach(b=>b.onclick = (e)=>{ const i = Number(e.target.dataset.i); const a = allocations[i]; const newAlloc = prompt('Edit allocated qty', a.allocated); if (newAlloc !== null){ allocations[i].allocated = toNumber(newAlloc); if (toNumber(allocations[i].issued) > toNumber(allocations[i].allocated)) allocations[i].issued = toNumber(allocations[i].allocated); // adjust issued if necessary
-      // update remarks accordingly
       if (allocations[i].issued === 0) allocations[i].remarks = '';
       else if (allocations[i].issued >= allocations[i].allocated) allocations[i].remarks = 'RO Completed';
       else allocations[i].remarks = 'Partially used';
@@ -579,57 +593,72 @@ function downloadXlsx(name,json){
 document.getElementById('downloadReport').addEventListener('click', ()=>{ const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated += toNumber(a.allocated); map[k].issued += toNumber(a.issued); }); const arr = Object.keys(map).map(k=>map[k]); downloadXlsx('depot_scheme_report.xlsx', arr); });
 document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); downloadXlsx('flagged_transactions.xlsx', lastFlagged); });
 
-/* ---------- Firebase sync functions ---------- */
+/* ---------- Firebase sync functions (defensive) ---------- */
 function initFirebaseAndSync(){
+  updateStatusBadge('', 'Local-only');
+  // only attempt if firebase global available
+  if (typeof window.firebase === 'undefined') {
+    safeLog('Firebase SDK not present; running local-only.');
+    updateStatusBadge('warn', 'Firebase SDK not loaded — local-only');
+    firebaseConnected = false;
+    return;
+  }
+
   try {
     firebaseApp = firebase.initializeApp(firebaseConfig);
-    try { if (typeof firebase.analytics === 'function') firebase.analytics(); } catch(e) { console.warn('Analytics init failed', e); }
+    try {
+      if (typeof firebase.analytics === 'function') firebase.analytics();
+    } catch(e) {
+      safeLog('Analytics init skipped (likely requires HTTPS):', e && e.message);
+    }
     firebaseDb = firebase.database();
     firebaseConnected = true;
-    console.log('Firebase initialized — attempting initial pull from DB');
-    // Pull data lists first, then allocations
+    updateStatusBadge('ok', 'Firebase connected (syncing...)');
+
+    // initial pull: data lists then allocations
     suppressPushOnce = true;
     firebaseDb.ref('/' + DATA_KEY).once('value').then(snap => {
       const val = snap.val();
       if (val && typeof val === 'object') {
         dataLists = val;
-        saveDataLists(); // will push unless suppressed; suppressed=true so won't push
+        saveDataLists(); // suppressed push prevents immediate push
         renderDataLists();
         populateSelects();
-        console.log('Pulled dataLists from Firebase');
+        safeLog('Pulled dataLists from Firebase');
       }
       return firebaseDb.ref('/' + ALLOC_KEY).once('value');
     }).then(snap2 => {
       const val2 = snap2.val();
       if (val2) {
-        // val2 may be array or object
         const arr = Array.isArray(val2) ? val2 : Object.values(val2);
         allocations = arr.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:Number(a.allocated||0), issued:Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' }));
-        saveAllocations(); // suppressed flag prevents pushing back immediately
+        saveAllocations(); // suppressed
         renderAllocTable();
         renderReport();
-        console.log('Pulled allocations from Firebase');
+        safeLog('Pulled allocations from Firebase');
       }
-    }).catch(err => console.warn('Firebase pull failed', err)).finally(()=>{ suppressPushOnce = false; });
+    }).catch(err => {
+      safeLog('Firebase initial pull failed:', err && err.message ? err.message : err);
+      updateStatusBadge('warn', 'Firebase: pull failed (check rules)');
+    }).finally(()=>{ suppressPushOnce = false; updateStatusBadge('ok', 'Firebase connected'); });
   } catch (err) {
-    console.warn('Firebase init error', err);
+    safeLog('Firebase init failed', err);
     firebaseConnected = false;
+    updateStatusBadge('err', 'Firebase init error');
   }
 }
-
 function pushDataListsToFirebase(){
   if (!firebaseConnected || !firebaseDb) return;
-  firebaseDb.ref('/' + DATA_KEY).set(dataLists).then(()=>{ console.log('Pushed dataLists to Firebase'); }).catch(err=>console.warn('Push dataLists failed', err));
+  firebaseDb.ref('/' + DATA_KEY).set(dataLists).then(()=>{ safeLog('Pushed dataLists to Firebase'); }).catch(err=>{ safeLog('Push dataLists failed', err && err.message); updateStatusBadge('warn', 'Firebase push failed'); });
 }
 function pushAllocationsToFirebase(){
   if (!firebaseConnected || !firebaseDb) return;
-  firebaseDb.ref('/' + ALLOC_KEY).set(allocations).then(()=>{ console.log('Pushed allocations to Firebase'); }).catch(err=>console.warn('Push allocations failed', err));
+  firebaseDb.ref('/' + ALLOC_KEY).set(allocations).then(()=>{ safeLog('Pushed allocations to Firebase'); }).catch(err=>{ safeLog('Push allocations failed', err && err.message); updateStatusBadge('warn', 'Firebase push failed'); });
 }
 
-/* ---------- Init ---------- */
+/* ---------- Boot ---------- */
 loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
-// initialize Firebase & attempt sync
-initFirebaseAndSync();
+try { initFirebaseAndSync(); } catch(e){ safeLog('initFirebaseAndSync error', e); updateStatusBadge('err','Firebase init error'); }
 
 /* Tab wiring */
 document.querySelectorAll('.tab').forEach(btn => {
@@ -644,11 +673,9 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (tab === 'data') renderDataLists();
   });
 });
-// show allocations by default
 document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
 document.querySelector('[data-tab="alloc"]').classList.add('active');
 document.getElementById('alloc').style.display = 'block';
-
 </script>
 </body>
 </html>
