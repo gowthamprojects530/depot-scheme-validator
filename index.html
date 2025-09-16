@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Live (Draft 3)</title>
+<title>Depot Scheme Validator — Live (Draft 4)</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
   :root{
     --bg: linear-gradient(180deg,#f7fbff 0%, #eef9ff 100%);
-    --card: rgba(255,255,255,0.9);
+    --card: rgba(255,255,255,0.95);
     --muted:#5b6b7a;
     --accent-1:#7c4dff; /* violet */
     --accent-2:#06b6d4; /* teal */
@@ -31,7 +31,7 @@
   .tab.active{background:linear-gradient(90deg, rgba(124,77,255,0.12), rgba(6,182,212,0.08));box-shadow:var(--soft-shadow);color:#08102a;font-weight:600}
   .card{background:var(--card);padding:18px;border-radius:var(--radius);margin-top:16px;border:1px solid var(--subtle);box-shadow:var(--soft-shadow)}
   .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  input[type="text"], input[type="number"], select, textarea { background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(245,250,255,0.9));border:1px solid rgba(11,17,26,0.06);color:#08102a;padding:10px;border-radius:10px;outline:none;min-height:36px}
+  input[type="text"], input[type="number"], select, textarea { background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(245,250,255,0.95));border:1px solid rgba(11,17,26,0.06);color:#08102a;padding:10px;border-radius:10px;outline:none;min-height:36px}
   textarea { min-height:80px; font-family:inherit; resize:vertical; }
   .btn{padding:10px 14px;border-radius:10px;border:1px solid rgba(11,17,26,0.06);cursor:pointer;background:linear-gradient(180deg,#fff,#f7fbff);box-shadow:0 6px 18px rgba(11,17,26,0.03)}
   .btn.primary{background:linear-gradient(90deg,var(--accent-1),var(--accent-2));color:#fff;border:0}
@@ -47,7 +47,7 @@
 
   /* Data screen styling */
   .data-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .list-card{padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.7),rgba(250,255,255,0.7));border:1px solid var(--subtle)}
+  .list-card{padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.9),rgba(250,255,255,0.9));border:1px solid var(--subtle)}
   .list-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:10px;margin-bottom:8px;background:rgba(10,18,30,0.02)}
   .list-actions button{margin-left:8px}
   .live-card{margin-top:12px;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(6,182,212,0.06),rgba(124,77,255,0.03));border:1px solid rgba(6,182,212,0.06)}
@@ -59,8 +59,8 @@
 <div class="container">
   <header>
     <div>
-      <h1>Depot Scheme Validator — Live (Draft 3)</h1>
-      <div class="sub">Gowtham Projects · Modern UI · 6-decimal precision · optional Firebase live sync</div>
+      <h1>Depot Scheme Validator — Live</h1>
+      <div class="sub">Gowtham Projects · 6-decimal precision · Firebase Realtime DB + Analytics</div>
     </div>
     <div class="small">Client-only · Offline/Online</div>
   </header>
@@ -100,14 +100,23 @@
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
         <div>
           <strong>Go Live (Free)</strong><br>
-          <div class="small" style="margin-top:6px">Host this file on GitHub Pages (static) and use Firebase Realtime Database for online storage (free Spark tier).</div>
+          <div class="small" style="margin-top:6px">Host this file on GitHub Pages and use Firebase Realtime Database (free Spark tier) for online storage.</div>
         </div>
-        <div class="chip">Free options: GitHub Pages + Firebase</div>
+        <div class="chip">Free: GitHub Pages + Firebase</div>
       </div>
 
       <div style="margin-top:12px">
-        <div class="small muted-note">Paste Firebase config below (from Firebase Console → Project Settings → SDK) then <strong>Connect</strong>. After connecting you can Push your local data or Pull from Firebase. Toggle "Auto sync" to push on change.</div>
-        <textarea id="firebaseConfig" placeholder='Paste your Firebase config JSON here (eg {"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...", ...})'></textarea>
+        <div class="small muted-note">Paste Firebase config below (from Firebase Console → Project Settings → SDK) then <strong>Connect</strong>. After connecting you can Push local data or Pull from Firebase. Toggle "Auto sync" to push automatically.</div>
+        <textarea id="firebaseConfig" placeholder='Paste your Firebase config JSON here (eg {"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...", ...})'>{
+  "apiKey": "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
+  "authDomain": "depot-validator-live.firebaseapp.com",
+  "databaseURL": "https://depot-validator-live-default-rtdb.firebaseio.com",
+  "projectId": "depot-validator-live",
+  "storageBucket": "depot-validator-live.firebasestorage.app",
+  "messagingSenderId": "1074593440181",
+  "appId": "1:1074593440181:web:1c156d92cc3303513379fc",
+  "measurementId": "G-J17RNGS230"
+}</textarea>
         <div style="margin-top:8px" class="flex">
           <button id="connectFirebase" class="btn primary">Connect</button>
           <button id="pushFirebase" class="btn" disabled>Push to Firebase</button>
@@ -214,16 +223,17 @@
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-<!-- Firebase compat SDK (Realtime Database) - only used if user pastes config & connects -->
+<!-- Firebase compat SDKs (for plain HTML) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
 
 <script>
-/* ========== Draft 3 — App State & Storage ========== */
+/* ---------- State & storage ---------- */
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
 let dataLists = {depots:[], schemes:[]};
-let allocations = []; // each object { depot, scheme, commodity, ro, allocated (Number with 6 dp), issued (Number 6 dp), lastIssued, remarks }
+let allocations = []; // { depot, scheme, commodity, ro, allocated, issued, lastIssued, remarks }
 let lastFlagged = [];
 
 let firebaseApp = null;
@@ -231,15 +241,13 @@ let firebaseDb = null;
 let firebaseConnected = false;
 let autoSync = false;
 
-/* ========== Helpers ========== */
+/* ---------- Helpers ---------- */
 function toFixed6Number(v){
   const n = Number(v || 0);
   if (!isFinite(n)) return 0;
-  // keep 6 decimal places and store as Number
   return Number(n.toFixed(6));
 }
 function formatQty(v){
-  // display exactly 6 decimals as string
   const n = Number(v || 0);
   if (!isFinite(n)) return '0.000000';
   return n.toFixed(6);
@@ -248,11 +256,11 @@ function loadDataLists(){ const raw = localStorage.getItem(DATA_KEY); dataLists 
 function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && autoSync) pushDataListsToFirebase(); }
 function loadAllocations(){ const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); }
 function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && autoSync) pushAllocationsToFirebase(); }
+function toNumber(v){ const n = Number(String(v || '').replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 function normStr(s){ if (s===null||s===undefined) return ''; return String(s).replace(/\u00A0/g,' ').trim().replace(/\s+/g,' '); }
 function esc(s){ return s===undefined||s===null?'':String(s).replace(/[&<>"'`]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[m]); }
-function toNumber(v){ const n = Number(String(v || '').replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 
-/* ========== Parsing XLSM / wide / xml ========== */
+/* ---------- XLSM / deterministic off-take extraction (commodity aware) ---------- */
 function colIndexToLetter(index){ let s=''; let i=index; while(i>=0){ s = String.fromCharCode((i%26)+65) + s; i = Math.floor(i/26) - 1; } return s; }
 
 function parseXlsmOfftake(wb){
@@ -301,6 +309,7 @@ function parseXlsmOfftake(wb){
   return records;
 }
 
+/* ---------- Generic file read (XML / XLSX / CSV / XLSM) ---------- */
 function parseXmlStringToRecords(xmlString){
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'application/xml');
@@ -405,7 +414,7 @@ function readFileToJson(file){
   });
 }
 
-/* ========== Validation: strict Depot+Scheme+Commodity matching + FIFO ========== */
+/* ---------- Validation (strict Depot+Scheme+Commodity match when commodity present) ---------- */
 function findKey(keys,cands){ const low = keys.map(k=>k.toLowerCase()); for (const c of cands){ const idx = low.indexOf(c); if (idx !== -1) return keys[idx]; } for (let i=0;i<low.length;i++){ for (const c of cands) if (low[i].includes(c)) return keys[i]; } return null; }
 
 document.getElementById('portalFile').addEventListener('change', (e)=>{ const f = e.target.files[0]; document.getElementById('portalFileName').innerText = f ? f.name : ''; });
@@ -519,7 +528,7 @@ document.getElementById('validateBtn').addEventListener('click', async ()=> {
   renderAllocTable(); renderFlagged(); renderReport();
 });
 
-/* ========== UI Render & Wiring (6 dp formatting) ========== */
+/* ---------- UI render & wiring ---------- */
 function populateSelects(){
   const depotSel = document.getElementById('depotSelect');
   const schemeSel = document.getElementById('schemeSelect');
@@ -548,19 +557,16 @@ document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=n
 document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 
 document.addEventListener('click', (e)=>{
-  // delete/edit handlers for data lists
   const t = e.target;
   if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
   if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
   if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
   if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
 
-  // allocation actions: delete/edit
   if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
   if (t.classList && t.classList.contains('edit-alloc')){
     const i = Number(t.dataset.i);
     const a = allocations[i];
-    // edit allocated quantity (6 dp)
     const newAlloc = prompt('Edit allocated qty (6 decimals)', formatQty(a.allocated));
     if (newAlloc !== null){
       const v = toFixed6Number(newAlloc);
@@ -625,7 +631,7 @@ function renderReport(){
   Object.keys(map).forEach((k,i)=>{ const r = map[k]; const bal = toFixed6Number(toNumber(r.allocated) - toNumber(r.issued)); const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${esc(r.depot)}</td><td>${esc(r.scheme)}</td><td>${esc(r.ro)}</td><td>${formatQty(r.allocated)}</td><td>${formatQty(r.issued)}</td><td>${formatQty(bal)}</td><td>${r.lastIssued?new Date(r.lastIssued).toLocaleString():'-'}</td>`; tbody.appendChild(tr); });
 }
 
-/* ========== Downloads (with 6 dp) ========== */
+/* Download helpers */
 function downloadXlsx(name,json){
   const ws = XLSX.utils.json_to_sheet(json);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'sheet1');
@@ -634,26 +640,24 @@ function downloadXlsx(name,json){
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
 }
 document.getElementById('downloadReport').addEventListener('click', ()=>{ const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated = toFixed6Number(toNumber(map[k].allocated) + toNumber(a.allocated)); map[k].issued = toFixed6Number(toNumber(map[k].issued) + toNumber(a.issued)); }); const arr = Object.keys(map).map(k=>{ const r = map[k]; return { depot: r.depot, scheme: r.scheme, ro: r.ro, commodity: r.commodity, allocated: formatQty(r.allocated), issued: formatQty(r.issued), balance: formatQty(toFixed6Number(toNumber(r.allocated)-toNumber(r.issued))), lastIssued: r.lastIssued }; }); downloadXlsx('depot_scheme_report.xlsx', arr); });
-document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); // map flagged numbers to 6dp
-  const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason }));
-  downloadXlsx('flagged_transactions.xlsx', arr);
-});
+document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason })); downloadXlsx('flagged_transactions.xlsx', arr); });
 
-/* ========== Firebase Live Sync (optional) ========== */
+/* Firebase Live Sync (optional) */
 document.getElementById('connectFirebase').addEventListener('click', ()=> {
   const txt = document.getElementById('firebaseConfig').value.trim();
   if (!txt) return alert('Paste your Firebase config JSON first (from Project Settings).');
   let cfg;
   try { cfg = JSON.parse(txt); } catch(e){ return alert('Invalid JSON'); }
   try {
-    // init firebase app
-    if (firebaseApp) firebaseApp.delete && firebaseApp.delete(); // try cleanup
+    if (firebaseApp && firebaseApp.delete) firebaseApp.delete();
   } catch(_) {}
   try {
     firebaseApp = firebase.initializeApp(cfg);
     firebaseDb = firebase.database();
+    // initialize analytics if measurementId present
+    try { if (typeof firebase.analytics === 'function') firebase.analytics(); } catch(e) { console.warn('Analytics init failed', e); }
     firebaseConnected = true;
-    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (Realtime DB).';
+    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (Realtime DB + Analytics).';
     document.getElementById('pushFirebase').disabled = false;
     document.getElementById('pullFirebase').disabled = false;
   } catch(err){
@@ -696,9 +700,10 @@ function pullFromFirebase(){
   }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Pull failed: '+err.message; });
 }
 
-/* ========== Init & Tabs ========== */
+/* Init */
 loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
 
+/* Tab wiring */
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', ()=> {
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -711,7 +716,6 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (tab === 'data') renderDataLists();
   });
 });
-// default
 document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
 document.querySelector('[data-tab="alloc"]').classList.add('active');
 document.getElementById('alloc').style.display = 'block';
