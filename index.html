@@ -96,28 +96,7 @@
       </div>
     </div>
 
-    <div class="live-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div>
-          <strong>Go Live (Free)</strong><br>
-          <div class="small" style="margin-top:6px">Host this file on GitHub Pages (static) and use Firebase Realtime Database for online storage (free Spark tier).</div>
-        </div>
-        <div class="chip">Free options: GitHub Pages + Firebase</div>
-      </div>
-
-      <div style="margin-top:12px">
-        <div class="small muted-note">Paste Firebase config below (from Firebase Console → Project Settings → SDK) then <strong>Connect</strong>. After connecting you can Push your local data or Pull from Firebase. Toggle "Auto sync" to push on change.</div>
-        <textarea id="firebaseConfig" placeholder='Paste your Firebase config JSON here (eg {"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...", ...})'></textarea>
-        <div style="margin-top:8px" class="flex">
-          <button id="connectFirebase" class="btn primary">Connect</button>
-          <button id="pushFirebase" class="btn" disabled>Push to Firebase</button>
-          <button id="pullFirebase" class="btn" disabled>Pull from Firebase</button>
-          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoSync" type="checkbox" /> Auto sync on change</label>
-        </div>
-        <div id="firebaseStatus" class="small" style="margin-top:8px"></div>
-      </div>
-    </div>
-  </div>
+  
 
   <!-- ALLOCATIONS TAB -->
   <div id="alloc" class="card tabpanel" role="tabpanel">
@@ -795,4 +774,5 @@ document.getElementById('alloc').style.display = 'block';
 </script>
 </body>
 </html>
+
 
