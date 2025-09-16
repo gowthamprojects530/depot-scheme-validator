@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Allocations (qty in form)</title>
+<title>Depot Scheme Validator — Live</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -44,7 +44,7 @@
       <h1>Depot Scheme Validator</h1>
       <div class="sub">Gowtham Projects — Quick add with quantity in form (edit allocation to change qty)</div>
     </div>
-    <div class="small">Client-only · Offline</div>
+    <div class="small">Client-only · Live</div>
   </header>
 
   <div class="tabs" role="tablist">
@@ -173,7 +173,24 @@
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+<!-- Firebase compat SDKs for plain HTML -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+
 <script>
+/* ---------- Firebase config (you provided) ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
+  authDomain: "depot-validator-live.firebaseapp.com",
+  databaseURL: "https://depot-validator-live-default-rtdb.firebaseio.com",
+  projectId: "depot-validator-live",
+  storageBucket: "depot-validator-live.firebasestorage.app",
+  messagingSenderId: "1074593440181",
+  appId: "1:1074593440181:web:1c156d92cc3303513379fc",
+  measurementId: "G-J17RNGS230"
+};
+
 /* ---------- State & storage ---------- */
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
@@ -181,11 +198,17 @@ let dataLists = {depots:[], schemes:[]};
 let allocations = []; // { depot, scheme, commodity, ro, allocated, issued, lastIssued, remarks }
 let lastFlagged = [];
 
+let firebaseApp = null;
+let firebaseDb = null;
+let firebaseConnected = false;
+// When pulling from firebase we suppress pushing local back immediately
+let suppressPushOnce = false;
+
 /* ---------- Helpers ---------- */
 function loadDataLists(){ const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : {depots:[], schemes:[]}; }
-function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); }
+function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && !suppressPushOnce) pushDataListsToFirebase(); suppressPushOnce = false; }
 function loadAllocations(){ const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:Number(a.allocated||0), issued:Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); }
-function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); }
+function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && !suppressPushOnce) pushAllocationsToFirebase(); suppressPushOnce = false; }
 function toNumber(v){ if (v===null||v===undefined) return 0; const n = Number(String(v).replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 function normStr(s){ if (s===null||s===undefined) return ''; return String(s).replace(/\u00A0/g,' ').trim().replace(/\s+/g,' '); }
 function esc(s){ return s===undefined||s===null?'':String(s).replace(/[&<>"'`]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[m]); }
@@ -556,8 +579,57 @@ function downloadXlsx(name,json){
 document.getElementById('downloadReport').addEventListener('click', ()=>{ const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated += toNumber(a.allocated); map[k].issued += toNumber(a.issued); }); const arr = Object.keys(map).map(k=>map[k]); downloadXlsx('depot_scheme_report.xlsx', arr); });
 document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); downloadXlsx('flagged_transactions.xlsx', lastFlagged); });
 
+/* ---------- Firebase sync functions ---------- */
+function initFirebaseAndSync(){
+  try {
+    firebaseApp = firebase.initializeApp(firebaseConfig);
+    try { if (typeof firebase.analytics === 'function') firebase.analytics(); } catch(e) { console.warn('Analytics init failed', e); }
+    firebaseDb = firebase.database();
+    firebaseConnected = true;
+    console.log('Firebase initialized — attempting initial pull from DB');
+    // Pull data lists first, then allocations
+    suppressPushOnce = true;
+    firebaseDb.ref('/' + DATA_KEY).once('value').then(snap => {
+      const val = snap.val();
+      if (val && typeof val === 'object') {
+        dataLists = val;
+        saveDataLists(); // will push unless suppressed; suppressed=true so won't push
+        renderDataLists();
+        populateSelects();
+        console.log('Pulled dataLists from Firebase');
+      }
+      return firebaseDb.ref('/' + ALLOC_KEY).once('value');
+    }).then(snap2 => {
+      const val2 = snap2.val();
+      if (val2) {
+        // val2 may be array or object
+        const arr = Array.isArray(val2) ? val2 : Object.values(val2);
+        allocations = arr.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:Number(a.allocated||0), issued:Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' }));
+        saveAllocations(); // suppressed flag prevents pushing back immediately
+        renderAllocTable();
+        renderReport();
+        console.log('Pulled allocations from Firebase');
+      }
+    }).catch(err => console.warn('Firebase pull failed', err)).finally(()=>{ suppressPushOnce = false; });
+  } catch (err) {
+    console.warn('Firebase init error', err);
+    firebaseConnected = false;
+  }
+}
+
+function pushDataListsToFirebase(){
+  if (!firebaseConnected || !firebaseDb) return;
+  firebaseDb.ref('/' + DATA_KEY).set(dataLists).then(()=>{ console.log('Pushed dataLists to Firebase'); }).catch(err=>console.warn('Push dataLists failed', err));
+}
+function pushAllocationsToFirebase(){
+  if (!firebaseConnected || !firebaseDb) return;
+  firebaseDb.ref('/' + ALLOC_KEY).set(allocations).then(()=>{ console.log('Pushed allocations to Firebase'); }).catch(err=>console.warn('Push allocations failed', err));
+}
+
 /* ---------- Init ---------- */
 loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
+// initialize Firebase & attempt sync
+initFirebaseAndSync();
 
 /* Tab wiring */
 document.querySelectorAll('.tab').forEach(btn => {
