@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Live (Draft 3)</title>
+<title>Depot Scheme Validator — Live (Draft 3) — Robust</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -12,8 +12,8 @@
     --bg: linear-gradient(180deg,#f7fbff 0%, #eef9ff 100%);
     --card: rgba(255,255,255,0.9);
     --muted:#5b6b7a;
-    --accent-1:#7c4dff; /* violet */
-    --accent-2:#06b6d4; /* teal */
+    --accent-1:#7c4dff;
+    --accent-2:#06b6d4;
     --glass: rgba(255,255,255,0.6);
     --soft-shadow: 0 12px 34px rgba(16,24,40,0.08);
     --subtle: rgba(16,24,40,0.04);
@@ -59,8 +59,8 @@
 <div class="container">
   <header>
     <div>
-      <h1>Depot Scheme Validator — Live (Draft 3)</h1>
-      <div class="sub">Gowtham Projects · Modern UI · 6-decimal precision · optional Firebase live sync</div>
+      <h1>Depot Scheme Validator — Live (Robust)</h1>
+      <div class="sub">Safe startup, 6-decimal precision, optional Firebase live sync</div>
     </div>
     <div class="small">Client-only · Offline/Online</div>
   </header>
@@ -100,19 +100,19 @@
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
         <div>
           <strong>Go Live (Free)</strong><br>
-          <div class="small" style="margin-top:6px">Host this file on GitHub Pages (static) and use Firebase Realtime Database for online storage (free Spark tier).</div>
+          <div class="small" style="margin-top:6px">Host this file on GitHub Pages and connect to Firebase Realtime Database for online storage (Spark/free tier).</div>
         </div>
-        <div class="chip">Free options: GitHub Pages + Firebase</div>
+        <div class="chip">Free: GitHub Pages + Firebase</div>
       </div>
 
       <div style="margin-top:12px">
-        <div class="small muted-note">Your Firebase config is prefilled below (from Project Settings). You can Connect / Push / Pull. Toggle "Auto sync" to push automatically on local changes.</div>
-        <textarea id="firebaseConfig" placeholder='Paste your Firebase config JSON here (from Project Settings)'></textarea>
+        <div class="small muted-note">Paste Firebase config (or keep embedded) then press Connect. After connecting you can Push or Pull. Toggle Auto sync to push on change.</div>
+        <textarea id="firebaseConfig" placeholder='Paste Firebase config JSON here (from Project Settings)'></textarea>
         <div style="margin-top:8px" class="flex">
           <button id="connectFirebase" class="btn primary">Connect</button>
           <button id="pushFirebase" class="btn" disabled>Push to Firebase</button>
           <button id="pullFirebase" class="btn" disabled>Pull from Firebase</button>
-          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoSync" type="checkbox" /> Auto sync on change</label>
+          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoSync" type="checkbox" /> Auto sync</label>
         </div>
         <div id="firebaseStatus" class="small" style="margin-top:8px"></div>
       </div>
@@ -152,7 +152,7 @@
       </div>
     </div>
 
-    <div style="margin-top:12px" class="small">Allocations persist locally. When live mode is connected you may push/pull to Firebase.</div>
+    <div style="margin-top:12px" class="small">Allocations persist locally. When Firebase connected you can push/pull.</div>
 
     <table id="allocTable" style="margin-top:14px">
       <thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>RO No</th><th>Allocated</th><th>Issued</th><th>Balance</th><th>Last Issued</th><th>Remarks</th><th>Actions</th></tr></thead>
@@ -214,12 +214,12 @@
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-<!-- Firebase compat SDK (Realtime Database) - only used if user connects -->
+<!-- Firebase compat SDK (Realtime Database) - optional -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
 <script>
-/* ========== Draft 3 — App State & Storage ========== */
+/* ---------- State & storage ---------- */
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
 let dataLists = {depots:[], schemes:[]};
@@ -231,9 +231,9 @@ let firebaseDb = null;
 let firebaseConnected = false;
 let autoSync = false;
 
-/* ---------- YOUR FIREBASE CONFIG (embedded) ---------- */
-const firebaseConfig = {
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+/* ---------- Embedded Firebase config (optional) ---------- */
+// If you want auto-connect on load, paste here. Otherwise leave empty and paste in textarea and press Connect.
+const EMBEDDED_FIREBASE_CONFIG = {
   apiKey: "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
   authDomain: "depot-validator-live.firebaseapp.com",
   databaseURL: "https://depot-validator-live-default-rtdb.firebaseio.com",
@@ -244,41 +244,34 @@ const firebaseConfig = {
   measurementId: "G-R0WRV6PD26"
 };
 
-/* ========== Helpers ========== */
+/* ---------- Helpers ---------- */
 function toFixed6Number(v){
   const n = Number(v || 0);
   if (!isFinite(n)) return 0;
   return Number(n.toFixed(6));
 }
 function formatQty(v){ const n = Number(v || 0); if (!isFinite(n)) return '0.000000'; return n.toFixed(6); }
-function loadDataLists(){ const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : {depots:[], schemes:[]}; }
-function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && autoSync) pushDataListsToFirebase(); }
-function loadAllocations(){ const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); }
-function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && autoSync) pushAllocationsToFirebase(); }
+function loadDataLists(){ try { const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : {depots:[], schemes:[]}; } catch(e){ console.warn('loadDataLists failed', e); dataLists = {depots:[], schemes:[]}; } }
+function saveDataLists(){ try { localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && autoSync) pushDataListsToFirebase(); } catch(e){ console.warn('saveDataLists failed', e); } }
+function loadAllocations(){ try { const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); } catch(e){ console.warn('loadAllocations failed', e); allocations = []; } }
+function saveAllocations(){ try { localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && autoSync) pushAllocationsToFirebase(); } catch(e){ console.warn('saveAllocations failed', e); } }
 function normStr(s){ if (s===null||s===undefined) return ''; return String(s).replace(/\u00A0/g,' ').trim().replace(/\s+/g,' '); }
 function esc(s){ return s===undefined||s===null?'':String(s).replace(/[&<>"'`]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[m]); }
 function toNumber(v){ const n = Number(String(v || '').replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 
-/* ========== Parsing XLSM / wide / xml ========== */
+/* ---------- Parsing XLSM / wide / xml ---------- */
 function colIndexToLetter(index){ let s=''; let i=index; while(i>=0){ s = String.fromCharCode((i%26)+65) + s; i = Math.floor(i/26) - 1; } return s; }
-
 function parseXlsmOfftake(wb){
   const first = wb.SheetNames[0];
   const ws = wb.Sheets[first];
   if (!ws) return [];
   const cellVal = (col,row) => { const addr = col + row; const cell = ws[addr]; if (!cell) return ''; const v = (cell.v !== undefined && cell.v !== null) ? cell.v : (cell.w !== undefined ? cell.w : ''); return v===null? '' : String(v).trim(); };
-
   const headerRow = 1;
   const b1 = cellVal('B', headerRow) || '';
   const b1Lower = String(b1).trim().toLowerCase();
-
   let commodityCol = null;
   let schemeStartColIndex = 1; // B
-  if (b1Lower.includes('commodity')) {
-    commodityCol = 'B';
-    schemeStartColIndex = 2; // C
-  }
-
+  if (b1Lower.includes('commodity')) { commodityCol = 'B'; schemeStartColIndex = 2; }
   const schemes = [];
   let cidx = schemeStartColIndex;
   while(true){
@@ -288,7 +281,6 @@ function parseXlsmOfftake(wb){
     if (header !== '') schemes.push({ col, name: normStr(header || '') });
     cidx++; if (cidx > 500) break;
   }
-
   const records = [];
   let r = 2;
   while(true){
@@ -307,7 +299,6 @@ function parseXlsmOfftake(wb){
   }
   return records;
 }
-
 function parseXmlStringToRecords(xmlString){
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'application/xml');
@@ -324,20 +315,15 @@ function parseXmlStringToRecords(xmlString){
   }).filter(r => Object.keys(r).length > 0);
   return recs;
 }
-
 function readFileToJson(file){
   return new Promise((resolve,reject) => {
     const name = (file.name || '').toLowerCase();
     if (name.endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml') {
       const fr = new FileReader();
       fr.onerror = ()=>reject(new Error('file read error'));
-      fr.onload = e => {
-        try { const recs = parseXmlStringToRecords(e.target.result); resolve(recs); } catch(err){ reject(err); }
-      };
-      fr.readAsText(file);
-      return;
+      fr.onload = e => { try { const recs = parseXmlStringToRecords(e.target.result); resolve(recs); } catch(err){ reject(err); } };
+      fr.readAsText(file); return;
     }
-
     const fr = new FileReader();
     fr.onerror = ()=>reject(new Error('file read error'));
     fr.onload = e => {
@@ -345,14 +331,9 @@ function readFileToJson(file){
       try {
         const arr = (data instanceof ArrayBuffer) ? new Uint8Array(data) : data;
         const wb = XLSX.read(arr, { type: 'array', cellDates: true });
-        if (name.endsWith('.xlsm')) {
-          const recs = parseXlsmOfftake(wb);
-          resolve(recs);
-          return;
-        }
+        if (name.endsWith('.xlsm')) { const recs = parseXlsmOfftake(wb); resolve(recs); return; }
         const ws = wb.Sheets[wb.SheetNames[0]];
         let json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
         if (json && json.length > 0) {
           const headers = Object.keys(json[0]);
           const depotHeader = headers.find(h => h.toLowerCase().includes('depot'));
@@ -375,10 +356,7 @@ function readFileToJson(file){
                   }
                 }
               }
-              if (pivoted.length > 0) {
-                resolve(pivoted);
-                return;
-              }
+              if (pivoted.length > 0) { resolve(pivoted); return; }
             } else {
               const schemeHeaders2 = headers.filter(h => h !== depotHeader && (totalHeaderIndex === -1 || h !== headers[totalHeaderIndex]));
               const pivoted2 = [];
@@ -407,268 +385,242 @@ function readFileToJson(file){
         } catch (err2) { reject(err2 || err); }
       }
     };
-
     if (FileReader.prototype.readAsArrayBuffer) fr.readAsArrayBuffer(file); else fr.readAsBinaryString(file);
   });
 }
 
-/* ========== Validation: strict Depot+Scheme+Commodity matching + FIFO ========== */
+/* ---------- Validation + FIFO apply ---------- */
 function findKey(keys,cands){ const low = keys.map(k=>k.toLowerCase()); for (const c of cands){ const idx = low.indexOf(c); if (idx !== -1) return keys[idx]; } for (let i=0;i<low.length;i++){ for (const c of cands) if (low[i].includes(c)) return keys[i]; } return null; }
 
 document.getElementById('portalFile').addEventListener('change', (e)=>{ const f = e.target.files[0]; document.getElementById('portalFileName').innerText = f ? f.name : ''; });
 
 document.getElementById('validateBtn').addEventListener('click', async ()=> {
-  const f = document.getElementById('portalFile').files[0];
-  if (!f) return alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)');
-  document.getElementById('validateStatus').innerText = 'Extracting data from file...';
-  let rows;
-  try { rows = await readFileToJson(f); } catch(err){ console.error(err); alert('Read failed: ' + (err && err.message ? err.message : 'unknown')); document.getElementById('validateStatus').innerText=''; return; }
-  if (!rows || rows.length === 0) { alert('No rows extracted'); document.getElementById('validateStatus').innerText=''; return; }
-
-  // detect keys
-  let depotKey, schemeKey, qtyKey, commodityKey;
-  if (f.name.toLowerCase().endsWith('.xlsm') || (rows[0].hasOwnProperty('depot') && rows[0].hasOwnProperty('scheme') && rows[0].hasOwnProperty('issued_amount'))) {
-    depotKey = 'depot'; schemeKey = 'scheme'; qtyKey = 'issued_amount';
-    if (rows[0].hasOwnProperty('commodity')) commodityKey = 'commodity';
-  } else {
-    const keys = Object.keys(rows[0]);
-    depotKey = findKey(keys, ['depot','depotname','depot_name']);
-    schemeKey = findKey(keys, ['scheme','schemename','scheme_name']);
-    qtyKey = findKey(keys, ['issued_amount','issued','qty','quantity','amount','lifted','liftedquantity']);
-    commodityKey = findKey(keys, ['commodity','commodityname','commodity_name','comm']);
-  }
-
-  if (!depotKey || !schemeKey || !qtyKey) {
-    alert('File must contain Depot, Scheme and Issued/Quantity fields (could not detect automatically).');
-    document.getElementById('validateStatus').innerText = 'Key detection failed.';
-    return;
-  }
-
-  loadAllocations();
-  const applied = [], flagged = [];
-  const useDate = document.getElementById('dateBehavior').value === 'useDate';
-  const nowISO = new Date().toISOString();
-  const lastIssuedMap = {};
-
-  for (const rec of rows) {
-    const rawDepot = normStr(rec[depotKey] ?? '');
-    const rawScheme = normStr(rec[schemeKey] ?? '');
-    const rawQty = toNumber(rec[qtyKey]);
-    const rawCommodity = commodityKey ? normStr(rec[commodityKey] ?? '') : '';
-
-    if (!rawDepot || !rawScheme) continue;
-    if (rawQty === 0) continue;
-
-    // filter allocations by depot & scheme
-    let matches = allocations.map((a, idx) => ({ ...a, __idx: idx }))
-      .filter(x => x.depot === rawDepot && x.scheme === rawScheme);
-
-    // require commodity match if extracted commodity non-empty
-    if (rawCommodity) matches = matches.filter(x => String(x.commodity || '').toLowerCase() === String(rawCommodity || '').toLowerCase());
-
-    if (!matches || matches.length === 0) {
-      const reason = rawCommodity ? 'No allocation for depot+scheme+commodity' : 'No allocation for depot+scheme';
-      flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, reason });
-      continue;
-    }
-
-    // sort by numeric RO where possible
-    matches.sort((a,b) => {
-      const na = Number(a.ro), nb = Number(b.ro);
-      if (!isNaN(na) && !isNaN(nb)) return na - nb;
-      if (!isNaN(na) && isNaN(nb)) return -1;
-      if (isNaN(na) && !isNaN(nb)) return 1;
-      return a.__idx - b.__idx;
-    });
-
-    let remaining = rawQty;
-    for (const m of matches){
-      if (remaining <= 0) break;
-      const idx = m.__idx;
-      const alloc = allocations[idx];
-      const avail = toFixed6Number(toNumber(alloc.allocated) - toNumber(alloc.issued));
-      if (avail <= 0) continue;
-      const consumeRaw = Math.min(avail, remaining);
-      const consume = toFixed6Number(consumeRaw);
-      allocations[idx].issued = toFixed6Number(toNumber(allocations[idx].issued) + consume);
-      const ts = useDate && rec.date ? rec.date : nowISO;
-      lastIssuedMap[idx] = ts;
-      remaining = toFixed6Number(remaining - consume);
-    }
-
-    if (remaining > 0) {
-      flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, leftover: remaining, reason: `Issued ${rawQty} exceeded available by ${remaining}` });
+  try {
+    const f = document.getElementById('portalFile').files[0];
+    if (!f) return alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)');
+    document.getElementById('validateStatus').innerText = 'Extracting data from file...';
+    let rows;
+    try { rows = await readFileToJson(f); } catch(err){ console.error(err); alert('Read failed: ' + (err && err.message ? err.message : 'unknown')); document.getElementById('validateStatus').innerText=''; return; }
+    if (!rows || rows.length === 0) { alert('No rows extracted'); document.getElementById('validateStatus').innerText=''; return; }
+    // detect keys
+    let depotKey, schemeKey, qtyKey, commodityKey;
+    if (f.name.toLowerCase().endsWith('.xlsm') || (rows[0].hasOwnProperty('depot') && rows[0].hasOwnProperty('scheme') && rows[0].hasOwnProperty('issued_amount'))) {
+      depotKey = 'depot'; schemeKey = 'scheme'; qtyKey = 'issued_amount';
+      if (rows[0].hasOwnProperty('commodity')) commodityKey = 'commodity';
     } else {
-      applied.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty });
+      const keys = Object.keys(rows[0]);
+      depotKey = findKey(keys, ['depot','depotname','depot_name']);
+      schemeKey = findKey(keys, ['scheme','schemename','scheme_name']);
+      qtyKey = findKey(keys, ['issued_amount','issued','qty','quantity','amount','lifted','liftedquantity']);
+      commodityKey = findKey(keys, ['commodity','commodityname','commodity_name','comm']);
     }
-  }
-
-  // cap and postprocess
-  for (let i=0;i<allocations.length;i++){
-    const a = allocations[i];
-    if (toNumber(a.issued) >= toNumber(a.allocated)) {
-      a.issued = toFixed6Number(a.allocated);
-      a.remarks = a.allocated > 0 ? 'RO Completed' : a.remarks || '';
-    } else if (toNumber(a.issued) > 0) {
-      a.remarks = 'Partially used';
-      a.issued = toFixed6Number(a.issued);
-    } else {
-      a.remarks = '';
-      a.issued = toFixed6Number(a.issued);
+    if (!depotKey || !schemeKey || !qtyKey) {
+      alert('File must contain Depot, Scheme and Issued/Quantity fields (could not detect automatically).');
+      document.getElementById('validateStatus').innerText = 'Key detection failed.'; return;
     }
-    if (lastIssuedMap[i]) a.lastIssued = lastIssuedMap[i];
-  }
 
-  saveAllocations();
-  lastFlagged = flagged;
-  document.getElementById('validateStatus').innerText = `Done. Applied: ${applied.length}, Flagged: ${flagged.length}`;
-  document.getElementById('downloadFlagged').disabled = flagged.length === 0;
-  renderAllocTable(); renderFlagged(); renderReport();
+    loadAllocations();
+    const applied = [], flagged = [];
+    const useDate = document.getElementById('dateBehavior').value === 'useDate';
+    const nowISO = new Date().toISOString();
+    const lastIssuedMap = {};
+
+    for (const rec of rows) {
+      const rawDepot = normStr(rec[depotKey] ?? '');
+      const rawScheme = normStr(rec[schemeKey] ?? '');
+      const rawQty = toNumber(rec[qtyKey]);
+      const rawCommodity = commodityKey ? normStr(rec[commodityKey] ?? '') : '';
+      if (!rawDepot || !rawScheme) continue;
+      if (rawQty === 0) continue;
+      let matches = allocations.map((a, idx) => ({ ...a, __idx: idx })).filter(x => x.depot === rawDepot && x.scheme === rawScheme);
+      if (rawCommodity) matches = matches.filter(x => String(x.commodity || '').toLowerCase() === String(rawCommodity || '').toLowerCase());
+      if (!matches || matches.length === 0) {
+        const reason = rawCommodity ? 'No allocation for depot+scheme+commodity' : 'No allocation for depot+scheme';
+        flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, reason });
+        continue;
+      }
+      matches.sort((a,b) => { const na = Number(a.ro), nb = Number(b.ro); if (!isNaN(na) && !isNaN(nb)) return na - nb; if (!isNaN(na) && isNaN(nb)) return -1; if (isNaN(na) && !isNaN(nb)) return 1; return a.__idx - b.__idx; });
+      let remaining = rawQty;
+      for (const m of matches){
+        if (remaining <= 0) break;
+        const idx = m.__idx;
+        const alloc = allocations[idx];
+        const avail = toFixed6Number(toNumber(alloc.allocated) - toNumber(alloc.issued));
+        if (avail <= 0) continue;
+        const consumeRaw = Math.min(avail, remaining);
+        const consume = toFixed6Number(consumeRaw);
+        allocations[idx].issued = toFixed6Number(toNumber(allocations[idx].issued) + consume);
+        const ts = useDate && rec.date ? rec.date : nowISO;
+        lastIssuedMap[idx] = ts;
+        remaining = toFixed6Number(remaining - consume);
+      }
+      if (remaining > 0) {
+        flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, leftover: remaining, reason: `Issued ${rawQty} exceeded available by ${remaining}` });
+      } else {
+        applied.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty });
+      }
+    }
+
+    // cap and postprocess
+    for (let i=0;i<allocations.length;i++){
+      const a = allocations[i];
+      if (toNumber(a.issued) >= toNumber(a.allocated)) {
+        a.issued = toFixed6Number(a.allocated);
+        a.remarks = a.allocated > 0 ? 'RO Completed' : a.remarks || '';
+      } else if (toNumber(a.issued) > 0) {
+        a.remarks = 'Partially used';
+        a.issued = toFixed6Number(a.issued);
+      } else {
+        a.remarks = '';
+        a.issued = toFixed6Number(a.issued);
+      }
+      if (lastIssuedMap[i]) a.lastIssued = lastIssuedMap[i];
+    }
+
+    saveAllocations();
+    lastFlagged = flagged;
+    document.getElementById('validateStatus').innerText = `Done. Applied: ${applied.length}, Flagged: ${flagged.length}`;
+    document.getElementById('downloadFlagged').disabled = flagged.length === 0;
+    renderAllocTable(); renderFlagged(); renderReport();
+  } catch(err){
+    console.error('Validation error', err);
+    alert('Validation failed: ' + (err && err.message ? err.message : 'unknown'));
+    document.getElementById('validateStatus').innerText = 'Validation failed';
+  }
 });
 
-/* ========== UI Render & Wiring (6 dp formatting) ========== */
+/* ---------- UI Render & Wiring ---------- */
 function populateSelects(){
-  const depotSel = document.getElementById('depotSelect');
-  const schemeSel = document.getElementById('schemeSelect');
-  depotSel.innerHTML = '<option value="">-- select depot --</option>';
-  schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
-  dataLists.depots.forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
-  dataLists.schemes.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
+  try {
+    const depotSel = document.getElementById('depotSelect');
+    const schemeSel = document.getElementById('schemeSelect');
+    if (!depotSel || !schemeSel) return;
+    depotSel.innerHTML = '<option value="">-- select depot --</option>';
+    schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
+    (dataLists.depots || []).forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
+    (dataLists.schemes || []).forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
+  } catch(e){ console.warn('populateSelects failed', e); }
 }
 
 function renderDataLists(){
-  const depotListEl = document.getElementById('depotList'); depotListEl.innerHTML='';
-  dataLists.depots.forEach((d,i)=>{ 
-    const el = document.createElement('div'); el.className='list-item';
-    el.innerHTML = `<div>${esc(d)}</div><div class="list-actions"><button class="btn" data-type="edit-depot" data-i="${i}">Edit</button><button class="btn" data-type="del-depot" data-i="${i}">Delete</button></div>`;
-    depotListEl.appendChild(el);
-  });
-  const schemeListEl = document.getElementById('schemeList'); schemeListEl.innerHTML='';
-  dataLists.schemes.forEach((s,i)=>{ 
-    const el = document.createElement('div'); el.className='list-item';
-    el.innerHTML = `<div>${esc(s)}</div><div class="list-actions"><button class="btn" data-type="edit-scheme" data-i="${i}">Edit</button><button class="btn" data-type="del-scheme" data-i="${i}">Delete</button></div>`;
-    schemeListEl.appendChild(el);
-  });
+  try {
+    const depotListEl = document.getElementById('depotList'); if (!depotListEl) return; depotListEl.innerHTML='';
+    (dataLists.depots || []).forEach((d,i)=>{ const el = document.createElement('div'); el.className='list-item'; el.innerHTML = `<div>${esc(d)}</div><div class="list-actions"><button class="btn" data-type="edit-depot" data-i="${i}">Edit</button><button class="btn" data-type="del-depot" data-i="${i}">Delete</button></div>`; depotListEl.appendChild(el); });
+    const schemeListEl = document.getElementById('schemeList'); if (!schemeListEl) return; schemeListEl.innerHTML='';
+    (dataLists.schemes || []).forEach((s,i)=>{ const el = document.createElement('div'); el.className='list-item'; el.innerHTML = `<div>${esc(s)}</div><div class="list-actions"><button class="btn" data-type="edit-scheme" data-i="${i}">Edit</button><button class="btn" data-type="del-scheme" data-i="${i}">Delete</button></div>`; schemeListEl.appendChild(el); });
+  } catch(e){ console.warn('renderDataLists failed', e); }
 }
 
 document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newDepot').value); if(!v) return alert('Type depot name'); if(!dataLists.depots.includes(v)) dataLists.depots.push(v); document.getElementById('newDepot').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 
 document.addEventListener('click', (e)=>{
-  const t = e.target;
-  if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
-  if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
-  if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
-  if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
+  try {
+    const t = e.target;
+    if (!t) return;
+    if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+    if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+    if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
+    if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
 
-  if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
-  if (t.classList && t.classList.contains('edit-alloc')){
-    const i = Number(t.dataset.i);
-    const a = allocations[i];
-    const newAlloc = prompt('Edit allocated qty (6 decimals)', formatQty(a.allocated));
-    if (newAlloc !== null){
-      const v = toFixed6Number(newAlloc);
-      allocations[i].allocated = v;
-      if (toNumber(allocations[i].issued) > toNumber(allocations[i].allocated)) allocations[i].issued = toFixed6Number(allocations[i].allocated);
-      if (allocations[i].issued === 0) allocations[i].remarks = '';
-      else if (toNumber(allocations[i].issued) >= toNumber(allocations[i].allocated)) allocations[i].remarks = 'RO Completed';
-      else allocations[i].remarks = 'Partially used';
-      saveAllocations(); renderAllocTable(); renderReport();
+    if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
+    if (t.classList && t.classList.contains('edit-alloc')){
+      const i = Number(t.dataset.i);
+      const a = allocations[i];
+      const newAlloc = prompt('Edit allocated qty (6 decimals)', formatQty(a.allocated));
+      if (newAlloc !== null){
+        const v = toFixed6Number(newAlloc);
+        allocations[i].allocated = v;
+        if (toNumber(allocations[i].issued) > toNumber(allocations[i].allocated)) allocations[i].issued = toFixed6Number(allocations[i].allocated);
+        if (allocations[i].issued === 0) allocations[i].remarks = '';
+        else if (toNumber(allocations[i].issued) >= toNumber(allocations[i].allocated)) allocations[i].remarks = 'RO Completed';
+        else allocations[i].remarks = 'Partially used';
+        saveAllocations(); renderAllocTable(); renderReport();
+      }
     }
-  }
+  } catch(err){ console.warn('click handler error', err); }
 });
 
 document.getElementById('addAllocBtn').addEventListener('click', ()=> {
-  const depot = document.getElementById('depotSelect').value;
-  const scheme = document.getElementById('schemeSelect').value;
-  const commodity = document.getElementById('commoditySelect').value;
-  const ro = document.getElementById('roInput').value.trim();
-  const qtyRaw = document.getElementById('qtyInput').value;
-  const qty = toFixed6Number(qtyRaw);
-  if (!depot) return alert('Select depot from Data tab first');
-  if (!scheme) return alert('Select scheme from Data tab first');
-  if (isNaN(qty) || qty < 0) return alert('Enter valid Qty (>= 0)');
-  allocations.push({ depot, scheme, commodity, ro, allocated: qty, issued: toFixed6Number(0), lastIssued: '', remarks: '' });
-  saveAllocations();
-  renderAllocTable();
-  renderReport();
-  document.getElementById('roInput').value = '';
-  document.getElementById('qtyInput').value = '';
+  try {
+    const depot = document.getElementById('depotSelect').value;
+    const scheme = document.getElementById('schemeSelect').value;
+    const commodity = document.getElementById('commoditySelect').value;
+    const ro = document.getElementById('roInput').value.trim();
+    const qtyRaw = document.getElementById('qtyInput').value;
+    const qty = toFixed6Number(qtyRaw);
+    if (!depot) return alert('Select depot from Data tab first');
+    if (!scheme) return alert('Select scheme from Data tab first');
+    if (isNaN(qty) || qty < 0) return alert('Enter valid Qty (>= 0)');
+    allocations.push({ depot, scheme, commodity, ro, allocated: qty, issued: toFixed6Number(0), lastIssued: '', remarks: '' });
+    saveAllocations();
+    renderAllocTable();
+    renderReport();
+    document.getElementById('roInput').value = '';
+    document.getElementById('qtyInput').value = '';
+  } catch(err){ console.warn('addAlloc error', err); }
 });
 
 function renderAllocTable(){
-  loadAllocations();
-  const tbody = document.querySelector('#allocTable tbody'); tbody.innerHTML = '';
-  allocations.forEach((a,i)=>{
-    const balance = toFixed6Number(toNumber(a.allocated) - toNumber(a.issued));
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${esc(a.depot)}</td><td>${esc(a.scheme)}</td><td>${esc(a.commodity)}</td><td>${esc(a.ro)}</td><td>${formatQty(a.allocated)}</td><td>${formatQty(a.issued)}</td><td>${formatQty(balance)}</td><td>${a.lastIssued?new Date(a.lastIssued).toLocaleString():'-'}</td><td>${esc(a.remarks||'')}</td><td><button class="btn edit-alloc" data-i="${i}">Edit</button> <button class="btn del-alloc" data-i="${i}">Delete</button></td>`;
-    tbody.appendChild(tr);
-  });
+  try {
+    loadAllocations();
+    const tbody = document.querySelector('#allocTable tbody'); if (!tbody) return; tbody.innerHTML = '';
+    allocations.forEach((a,i)=>{
+      const balance = toFixed6Number(toNumber(a.allocated) - toNumber(a.issued));
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i+1}</td><td>${esc(a.depot)}</td><td>${esc(a.scheme)}</td><td>${esc(a.commodity)}</td><td>${esc(a.ro)}</td><td>${formatQty(a.allocated)}</td><td>${formatQty(a.issued)}</td><td>${formatQty(balance)}</td><td>${a.lastIssued?new Date(a.lastIssued).toLocaleString():'-'}</td><td>${esc(a.remarks||'')}</td><td><button class="btn edit-alloc" data-i="${i}">Edit</button> <button class="btn del-alloc" data-i="${i}">Delete</button></td>`;
+      tbody.appendChild(tr);
+    });
+  } catch(err){ console.warn('renderAllocTable failed', err); }
 }
 
 function renderFlagged(){
-  const area = document.getElementById('flaggedArea'); area.innerHTML = '';
-  if (!lastFlagged || lastFlagged.length === 0){ area.innerHTML = '<div class="small">No flagged transactions.</div>'; return; }
-  let html = '<table><thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>Issued</th><th>Leftover</th><th>Reason</th></tr></thead><tbody>';
-  lastFlagged.forEach((f,i)=>{ html += `<tr><td>${i+1}</td><td>${esc(f.depot)}</td><td>${esc(f.scheme)}</td><td>${esc(f.commodity||'')}</td><td>${formatQty(f.issued_amount)}</td><td>${f.leftover?formatQty(f.leftover):''}</td><td>${esc(f.reason)}</td></tr>`; });
-  html += '</tbody></table>';
-  area.innerHTML = html;
+  try {
+    const area = document.getElementById('flaggedArea'); if (!area) return; area.innerHTML = '';
+    if (!lastFlagged || lastFlagged.length === 0){ area.innerHTML = '<div class="small">No flagged transactions.</div>'; return; }
+    let html = '<table><thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>Issued</th><th>Leftover</th><th>Reason</th></tr></thead><tbody>';
+    lastFlagged.forEach((f,i)=>{ html += `<tr><td>${i+1}</td><td>${esc(f.depot)}</td><td>${esc(f.scheme)}</td><td>${esc(f.commodity||'')}</td><td>${formatQty(f.issued_amount)}</td><td>${f.leftover?formatQty(f.leftover):''}</td><td>${esc(f.reason)}</td></tr>`; });
+    html += '</tbody></table>'; area.innerHTML = html;
+  } catch(err){ console.warn('renderFlagged failed', err); }
 }
 
 function renderReport(){
-  const tbody = document.querySelector('#reportTable tbody'); tbody.innerHTML = '';
-  const map = {};
-  allocations.forEach(a=>{
-    const key = `${a.depot}||${a.scheme}||${a.ro}`;
-    if (!map[key]) map[key] = { depot:a.depot, scheme:a.scheme, ro:a.ro, allocated:0, issued:0, lastIssued: a.lastIssued || '' , commodity: a.commodity || ''};
-    map[key].allocated = toFixed6Number(toNumber(map[key].allocated) + toNumber(a.allocated));
-    map[key].issued = toFixed6Number(toNumber(map[key].issued) + toNumber(a.issued));
-    if (a.lastIssued) map[key].lastIssued = a.lastIssued;
-  });
-  Object.keys(map).forEach((k,i)=>{ const r = map[k]; const bal = toFixed6Number(toNumber(r.allocated) - toNumber(r.issued)); const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${esc(r.depot)}</td><td>${esc(r.scheme)}</td><td>${esc(r.ro)}</td><td>${formatQty(r.allocated)}</td><td>${formatQty(r.issued)}</td><td>${formatQty(bal)}</td><td>${r.lastIssued?new Date(r.lastIssued).toLocaleString():'-'}</td>`; tbody.appendChild(tr); });
+  try {
+    const tbody = document.querySelector('#reportTable tbody'); if (!tbody) return; tbody.innerHTML = '';
+    const map = {};
+    allocations.forEach(a=>{
+      const key = `${a.depot}||${a.scheme}||${a.ro}`;
+      if (!map[key]) map[key] = { depot:a.depot, scheme:a.scheme, ro:a.ro, allocated:0, issued:0, lastIssued: a.lastIssued || '' , commodity: a.commodity || ''};
+      map[key].allocated = toFixed6Number(toNumber(map[key].allocated) + toNumber(a.allocated));
+      map[key].issued = toFixed6Number(toNumber(map[key].issued) + toNumber(a.issued));
+      if (a.lastIssued) map[key].lastIssued = a.lastIssued;
+    });
+    Object.keys(map).forEach((k,i)=>{ const r = map[k]; const bal = toFixed6Number(toNumber(r.allocated) - toNumber(r.issued)); const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${esc(r.depot)}</td><td>${esc(r.scheme)}</td><td>${esc(r.ro)}</td><td>${formatQty(r.allocated)}</td><td>${formatQty(r.issued)}</td><td>${formatQty(bal)}</td><td>${r.lastIssued?new Date(r.lastIssued).toLocaleString():'-'}</td>`; tbody.appendChild(tr); });
+  } catch(err){ console.warn('renderReport failed', err); }
 }
 
-/* ========== Downloads (with 6 dp) ========== */
+/* ---------- Downloads ---------- */
 function downloadXlsx(name,json){
-  const ws = XLSX.utils.json_to_sheet(json);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'sheet1');
-  const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-  const blob = new Blob([wbout], { type:'application/octet-stream' });
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
+  try {
+    const ws = XLSX.utils.json_to_sheet(json);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'sheet1');
+    const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+    const blob = new Blob([wbout], { type:'application/octet-stream' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
+  } catch(err){ console.warn('downloadXlsx failed', err); alert('Download failed'); }
 }
-document.getElementById('downloadReport').addEventListener('click', ()=>{ const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated = toFixed6Number(toNumber(map[k].allocated) + toNumber(a.allocated)); map[k].issued = toFixed6Number(toNumber(map[k].issued) + toNumber(a.issued)); }); const arr = Object.keys(map).map(k=>{ const r = map[k]; return { depot: r.depot, scheme: r.scheme, ro: r.ro, commodity: r.commodity, allocated: formatQty(r.allocated), issued: formatQty(r.issued), balance: formatQty(toFixed6Number(toNumber(r.allocated)-toNumber(r.issued))), lastIssued: r.lastIssued }; }); downloadXlsx('depot_scheme_report.xlsx', arr); });
-document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason })); downloadXlsx('flagged_transactions.xlsx', arr); });
+document.getElementById('downloadReport').addEventListener('click', ()=>{ try {
+  const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated = toFixed6Number(toNumber(map[k].allocated) + toNumber(a.allocated)); map[k].issued = toFixed6Number(toNumber(map[k].issued) + toNumber(a.issued)); }); const arr = Object.keys(map).map(k=>{ const r = map[k]; return { depot: r.depot, scheme: r.scheme, ro: r.ro, commodity: r.commodity, allocated: formatQty(r.allocated), issued: formatQty(r.issued), balance: formatQty(toFixed6Number(toNumber(r.allocated)-toNumber(r.issued))), lastIssued: r.lastIssued }; }); downloadXlsx('depot_scheme_report.xlsx', arr);
+} catch(err){ console.warn('downloadReport error', err); }});
+document.getElementById('downloadFlagged').addEventListener('click', ()=>{ try {
+  if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason })); downloadXlsx('flagged_transactions.xlsx', arr);
+} catch(err){ console.warn('downloadFlagged error', err); }});
 
-/* ========== Firebase Live Sync (optional) ========== */
-function initFirebaseFromEmbeddedConfig() {
+/* ---------- Firebase Live Sync (optional) ---------- */
+function connectFirebaseWithConfig(cfg){
   try {
-    // prefill textarea for visibility
-    const cfgArea = document.getElementById('firebaseConfig');
-    try { cfgArea.value = JSON.stringify(firebaseConfig, null, 2); } catch(e) { cfgArea.value = ''; }
-
-    // initialize firebase automatically
-    firebaseApp = firebase.initializeApp(firebaseConfig);
-    firebaseDb = firebase.database();
-    firebaseConnected = true;
-    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (Realtime DB).';
-    document.getElementById('pushFirebase').disabled = false;
-    document.getElementById('pullFirebase').disabled = false;
-  } catch(err) {
-    firebaseConnected = false;
-    document.getElementById('firebaseStatus').innerText = 'Firebase init failed: ' + (err && err.message ? err.message : err);
-  }
-}
-
-document.getElementById('connectFirebase').addEventListener('click', ()=> {
-  const txt = document.getElementById('firebaseConfig').value.trim();
-  if (!txt) return alert('Paste your Firebase config JSON first (from Project Settings).');
-  let cfg;
-  try { cfg = JSON.parse(txt); } catch(e){ return alert('Invalid JSON'); }
-  try {
-    if (firebaseApp && firebaseApp.delete) { try { firebaseApp.delete(); } catch(_) {} }
-  } catch(_) {}
-  try {
+    if (!cfg) throw new Error('No config');
+    if (firebaseApp && firebaseApp.delete) { try { firebaseApp.delete(); } catch(_){} }
     firebaseApp = firebase.initializeApp(cfg);
     firebaseDb = firebase.database();
     firebaseConnected = true;
@@ -677,33 +629,32 @@ document.getElementById('connectFirebase').addEventListener('click', ()=> {
     document.getElementById('pullFirebase').disabled = false;
   } catch(err){
     firebaseConnected = false;
-    document.getElementById('firebaseStatus').innerText = 'Firebase init failed: ' + (err.message || err);
+    document.getElementById('firebaseStatus').innerText = 'Firebase init failed: ' + (err && err.message ? err.message : err);
+    console.warn('connectFirebaseWithConfig failed', err);
   }
+}
+
+// prefill textarea with embedded config (for convenience) but do NOT auto-initialize
+try { document.getElementById('firebaseConfig').value = JSON.stringify(EMBEDDED_FIREBASE_CONFIG, null, 2); } catch(_) {}
+
+document.getElementById('connectFirebase').addEventListener('click', ()=> {
+  const txt = document.getElementById('firebaseConfig').value.trim();
+  if (!txt) return alert('Paste your Firebase config JSON first (from Project Settings).');
+  let cfg;
+  try { cfg = JSON.parse(txt); } catch(e){ return alert('Invalid JSON'); }
+  connectFirebaseWithConfig(cfg);
 });
 
 document.getElementById('pushFirebase').addEventListener('click', ()=> {
-  if (!firebaseConnected) return alert('Connect Firebase first.');
-  pushDataListsToFirebase();
-  pushAllocationsToFirebase();
+  if (!firebaseConnected || !firebaseDb) return alert('Connect Firebase first.');
+  try {
+    firebaseDb.ref('/'+DATA_KEY).set(dataLists).then(()=>{ document.getElementById('firebaseStatus').innerText = 'Data lists pushed.' }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Push failed: '+err.message });
+    firebaseDb.ref('/'+ALLOC_KEY).set(allocations).then(()=>{ document.getElementById('firebaseStatus').innerText = 'Allocations pushed.' }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Push failed: '+err.message });
+  } catch(err){ console.warn('pushFirebase error', err); alert('Push failed'); }
 });
 
 document.getElementById('pullFirebase').addEventListener('click', ()=> {
-  if (!firebaseConnected) return alert('Connect Firebase first.');
-  pullFromFirebase();
-});
-
-document.getElementById('autoSync').addEventListener('change', (e)=>{ autoSync = e.target.checked; });
-
-function pushDataListsToFirebase(){
-  if (!firebaseDb) return;
-  firebaseDb.ref('/'+DATA_KEY).set(dataLists).then(()=>{ document.getElementById('firebaseStatus').innerText = 'Data lists pushed.' }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Push failed: '+err.message });
-}
-function pushAllocationsToFirebase(){
-  if (!firebaseDb) return;
-  firebaseDb.ref('/'+ALLOC_KEY).set(allocations).then(()=>{ document.getElementById('firebaseStatus').innerText = 'Allocations pushed.' }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Push failed: '+err.message });
-}
-function pullFromFirebase(){
-  if (!firebaseDb) return;
+  if (!firebaseConnected || !firebaseDb) return alert('Connect Firebase first.');
   document.getElementById('firebaseStatus').innerText = 'Pulling...';
   firebaseDb.ref('/'+DATA_KEY).once('value').then(snap=>{
     const val = snap.val();
@@ -713,30 +664,39 @@ function pullFromFirebase(){
     const val2 = snap2.val();
     if (val2) { allocations = (Array.isArray(val2) ? val2 : Object.values(val2)).map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); saveAllocations(); renderAllocTable(); renderReport(); document.getElementById('firebaseStatus').innerText = 'Pulled allocations.'; }
   }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Pull failed: '+err.message; });
-}
-
-/* ========== Init & Tabs ========== */
-loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
-
-// initialize firebase from embedded config automatically
-try { initFirebaseFromEmbeddedConfig(); } catch(e){ console.warn('Auto firebase init failed', e); }
-
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', ()=> {
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    document.querySelectorAll('.tabpanel').forEach(p=>p.style.display='none');
-    document.getElementById(tab).style.display = 'block';
-    if (tab === 'alloc') renderAllocTable();
-    if (tab === 'report') renderReport();
-    if (tab === 'data') renderDataLists();
-  });
 });
-// default
-document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-document.querySelector('[data-tab="alloc"]').classList.add('active');
-document.getElementById('alloc').style.display = 'block';
+
+document.getElementById('autoSync').addEventListener('change', (e)=>{ autoSync = e.target.checked; });
+
+/* ---------- Init & Tabs ---------- */
+try {
+  loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
+} catch(err){ console.warn('startup error', err); }
+
+(function wireTabs(){
+  try {
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(btn => {
+      btn.addEventListener('click', ()=> {
+        tabs.forEach(t=>t.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tabpanel').forEach(p=>p.style.display='none');
+        const panel = document.getElementById(tab);
+        if (panel) panel.style.display = 'block';
+        if (tab === 'alloc') renderAllocTable();
+        if (tab === 'report') renderReport();
+        if (tab === 'data') renderDataLists();
+      });
+    });
+    // default
+    tabs.forEach(t=>t.classList.remove('active'));
+    const defaultBtn = document.querySelector('[data-tab="alloc"]');
+    if (defaultBtn) defaultBtn.classList.add('active');
+    const allocPanel = document.getElementById('alloc');
+    if (allocPanel) allocPanel.style.display = 'block';
+  } catch(err){ console.warn('wireTabs failed', err); }
+})();
 </script>
 </body>
 </html>
