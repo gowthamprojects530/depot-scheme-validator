@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Live (Draft 3) — Robust</title>
+<title>Depot Scheme Validator — Live (Safe)</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -14,689 +14,197 @@
     --muted:#5b6b7a;
     --accent-1:#7c4dff;
     --accent-2:#06b6d4;
-    --glass: rgba(255,255,255,0.6);
     --soft-shadow: 0 12px 34px rgba(16,24,40,0.08);
     --subtle: rgba(16,24,40,0.04);
     --gap:12px;
     --radius:14px;
   }
-
   html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#0b1220;background:var(--bg)}
   .container{max-width:1200px;margin:28px auto;padding:20px}
   header{display:flex;align-items:center;justify-content:space-between;gap:12px}
   h1{font-size:20px;margin:0;color:#061129}
   .sub{color:var(--muted);font-size:13px}
   .tabs{display:flex;gap:8px;margin-top:18px}
-  .tab{padding:8px 14px;border-radius:10px;background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;backdrop-filter: blur(2px)}
+  .tab{padding:8px 14px;border-radius:10px;background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer}
   .tab.active{background:linear-gradient(90deg, rgba(124,77,255,0.12), rgba(6,182,212,0.08));box-shadow:var(--soft-shadow);color:#08102a;font-weight:600}
   .card{background:var(--card);padding:18px;border-radius:var(--radius);margin-top:16px;border:1px solid var(--subtle);box-shadow:var(--soft-shadow)}
   .flex{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  input[type="text"], input[type="number"], select, textarea { background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(245,250,255,0.9));border:1px solid rgba(11,17,26,0.06);color:#08102a;padding:10px;border-radius:10px;outline:none;min-height:36px}
-  textarea { min-height:80px; font-family:inherit; resize:vertical; }
-  .btn{padding:10px 14px;border-radius:10px;border:1px solid rgba(11,17,26,0.06);cursor:pointer;background:linear-gradient(180deg,#fff,#f7fbff);box-shadow:0 6px 18px rgba(11,17,26,0.03)}
+  input[type="text"], input[type="number"], select { background:#fff;border:1px solid rgba(11,17,26,0.06);padding:10px;border-radius:10px;min-height:36px}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid rgba(11,17,26,0.06);cursor:pointer;background:linear-gradient(180deg,#fff,#f7fbff)}
   .btn.primary{background:linear-gradient(90deg,var(--accent-1),var(--accent-2));color:#fff;border:0}
-  .file-input-wrapper{display:inline-flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:linear-gradient(135deg,#eef6ff,#f0fcfb);cursor:pointer;border:1px solid rgba(13,23,40,0.04)}
   table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;border-radius:8px;overflow:hidden}
   th,td{padding:10px;border-bottom:1px solid rgba(11,17,26,0.04);text-align:left}
-  th{color:var(--muted);font-weight:700;font-size:13px;background:linear-gradient(180deg,rgba(124,77,255,0.03),rgba(6,182,212,0.02));}
+  th{color:var(--muted);font-weight:700;font-size:13px;background:linear-gradient(180deg,rgba(124,77,255,0.03),rgba(6,182,212,0.02))}
   .small{font-size:13px;color:var(--muted)}
   .alloc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--gap);align-items:end;width:100%}
   .alloc-grid .full-row{grid-column:1/-1;display:flex;justify-content:center;margin-top:10px}
-  .footer-brand{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#f1eefc,#f0fbfa);color:#0b1220}
-  @media (max-width:1000px){ .alloc-grid{grid-template-columns:repeat(2,1fr)} }
-
-  /* Data screen styling */
-  .data-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .list-card{padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.7),rgba(250,255,255,0.7));border:1px solid var(--subtle)}
-  .list-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:10px;margin-bottom:8px;background:rgba(10,18,30,0.02)}
-  .list-actions button{margin-left:8px}
-  .live-card{margin-top:12px;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(6,182,212,0.06),rgba(124,77,255,0.03));border:1px solid rgba(6,182,212,0.06)}
-  .muted-note{color:#0b2b34;font-size:13px;opacity:0.9}
-  .chip{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(11,17,26,0.04);font-size:13px}
+  .footer-brand{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#f0fbfa}
 </style>
 </head>
 <body>
 <div class="container">
   <header>
     <div>
-      <h1>Depot Scheme Validator — Live (Robust)</h1>
-      <div class="sub">Safe startup, 6-decimal precision, optional Firebase live sync</div>
+      <h1>Depot Scheme Validator — Live (Safe)</h1>
+      <div class="sub">Crash-proof · 6-decimal precision</div>
     </div>
-    <div class="small">Client-only · Offline/Online</div>
+    <div class="small">Offline/Online Ready</div>
   </header>
 
-  <div class="tabs" role="tablist">
+  <div class="tabs">
     <button class="tab active" data-tab="alloc">Allocations</button>
     <button class="tab" data-tab="validate">Validation</button>
     <button class="tab" data-tab="report">Report</button>
     <button class="tab" data-tab="data">Data</button>
   </div>
 
-  <!-- DATA TAB -->
+  <!-- Data Tab -->
   <div id="data" class="card tabpanel" style="display:none">
-    <div class="data-columns">
-      <div class="list-card">
+    <div class="flex" style="align-items:flex-start">
+      <div style="flex:1">
         <strong>Depot Names</strong>
-        <div class="small" style="margin-top:6px">Add / remove depot names (populates Allocation dropdown)</div>
+        <div class="small">Add / remove depot names</div>
         <div style="margin-top:10px" class="flex">
-          <input id="newDepot" type="text" placeholder="Depot name (e.g. ABC [SE15001])" style="flex:1"/>
+          <input id="newDepot" type="text" placeholder="Depot name"/>
           <button id="addDepotBtn" class="btn primary">Add</button>
         </div>
-        <div id="depotList" style="margin-top:12px"></div>
+        <ul id="depotList"></ul>
       </div>
-
-      <div class="list-card">
+      <div style="flex:1">
         <strong>Scheme Names</strong>
-        <div class="small" style="margin-top:6px">Add / remove schemes</div>
+        <div class="small">Add / remove schemes</div>
         <div style="margin-top:10px" class="flex">
-          <input id="newScheme" type="text" placeholder="Scheme name (e.g. NFSA – AAY)" style="flex:1"/>
+          <input id="newScheme" type="text" placeholder="Scheme name"/>
           <button id="addSchemeBtn" class="btn primary">Add</button>
         </div>
-        <div id="schemeList" style="margin-top:12px"></div>
-      </div>
-    </div>
-
-    <div class="live-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div>
-          <strong>Go Live (Free)</strong><br>
-          <div class="small" style="margin-top:6px">Host this file on GitHub Pages and connect to Firebase Realtime Database for online storage (Spark/free tier).</div>
-        </div>
-        <div class="chip">Free: GitHub Pages + Firebase</div>
-      </div>
-
-      <div style="margin-top:12px">
-        <div class="small muted-note">Paste Firebase config (or keep embedded) then press Connect. After connecting you can Push or Pull. Toggle Auto sync to push on change.</div>
-        <textarea id="firebaseConfig" placeholder='Paste Firebase config JSON here (from Project Settings)'></textarea>
-        <div style="margin-top:8px" class="flex">
-          <button id="connectFirebase" class="btn primary">Connect</button>
-          <button id="pushFirebase" class="btn" disabled>Push to Firebase</button>
-          <button id="pullFirebase" class="btn" disabled>Pull from Firebase</button>
-          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoSync" type="checkbox" /> Auto sync</label>
-        </div>
-        <div id="firebaseStatus" class="small" style="margin-top:8px"></div>
+        <ul id="schemeList"></ul>
       </div>
     </div>
   </div>
 
-  <!-- ALLOCATIONS TAB -->
-  <div id="alloc" class="card tabpanel" role="tabpanel">
-    <div class="alloc-grid" aria-label="Allocation form">
+  <!-- Allocations Tab -->
+  <div id="alloc" class="card tabpanel">
+    <div class="alloc-grid">
       <div>
         <label class="small">Depot</label><br>
         <select id="depotSelect"><option value="">-- select depot --</option></select>
       </div>
-
       <div>
         <label class="small">Scheme</label><br>
         <select id="schemeSelect"><option value="">-- select scheme --</option></select>
       </div>
-
       <div>
         <label class="small">Commodity</label><br>
         <select id="commoditySelect"><option>Rice</option><option>Wheat</option></select>
       </div>
-
       <div>
         <label class="small">RO No</label><br>
-        <input id="roInput" type="text" placeholder="RO number" />
+        <input id="roInput" type="text"/>
       </div>
-
       <div>
-        <label class="small">Qty (Allocated)</label><br>
-        <input id="qtyInput" type="number" min="0" step="any" placeholder="e.g. 200.000000" />
+        <label class="small">Qty</label><br>
+        <input id="qtyInput" type="number" step="any"/>
       </div>
-
       <div class="full-row">
         <button id="addAllocBtn" class="btn primary">Save Allocation</button>
       </div>
     </div>
 
-    <div style="margin-top:12px" class="small">Allocations persist locally. When Firebase connected you can push/pull.</div>
-
-    <table id="allocTable" style="margin-top:14px">
-      <thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>RO No</th><th>Allocated</th><th>Issued</th><th>Balance</th><th>Last Issued</th><th>Remarks</th><th>Actions</th></tr></thead>
+    <table id="allocTable">
+      <thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>RO</th><th>Allocated</th><th>Issued</th><th>Balance</th><th>Remarks</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
 
-  <!-- VALIDATION TAB -->
+  <!-- Validation Tab -->
   <div id="validate" class="card tabpanel" style="display:none">
-    <div class="flex" style="align-items:center">
-      <div>
-        <label class="small">Portal export (XML / CSV / XLSX / XLSM)</label><br>
-        <label class="file-input-wrapper">Choose portal file
-          <input id="portalFile" type="file" accept=".xml,.csv,.xlsx,.xls,.xlsm" />
-        </label>
-        <span id="portalFileName" class="small" style="margin-left:12px;color:#334155;"></span>
-      </div>
-      <div>
-        <label class="small">Date tracking</label><br>
-        <select id="dateBehavior">
-          <option value="nowDate" selected>Use current timestamp</option>
-          <option value="useDate">Use transaction date (if present)</option>
-        </select>
-      </div>
-      <div style="margin-left:auto" class="flex">
-        <button id="validateBtn" class="btn primary">Extract & Validate</button>
-        <button id="downloadFlagged" class="btn" disabled style="margin-left:8px">Download Flagged</button>
-      </div>
-    </div>
-
-    <div id="validateStatus" class="small" style="margin-top:12px"></div>
-
-    <h4 style="margin-top:12px">Flagged transactions</h4>
-    <div id="flaggedArea" class="small">No run yet</div>
+    <p class="small">Upload portal export file and validate.</p>
   </div>
 
-  <!-- REPORT TAB -->
+  <!-- Report Tab -->
   <div id="report" class="card tabpanel" style="display:none">
-    <div class="flex">
-      <div style="flex:1">
-        <strong>Depot → Scheme → RO Report</strong><br><div class="small">Allocated · Issued · Balance · Last Issued</div>
-      </div>
-      <div class="right">
-        <button id="downloadReport" class="btn">Download Report</button>
-      </div>
-    </div>
-
-    <table id="reportTable" style="margin-top:12px">
-      <thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>RO No</th><th>Allocated</th><th>Issued</th><th>Balance</th><th>Last Issued</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <p class="small">Report will appear here.</p>
   </div>
 
-  <footer style="margin-top:18px">
-    <div class="footer-brand"><span style="background:linear-gradient(90deg,#7c4dff,#06b6d4);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700">Gowtham</span> Projects</div>
+  <footer style="margin-top:20px">
+    <div class="footer-brand">Gowtham Projects</div>
   </footer>
 </div>
 
-<!-- SheetJS -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-<!-- Firebase compat SDK (Realtime Database) - optional -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
 <script>
-/* ---------- State & storage ---------- */
+/* Safe storage + defaults */
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
-let dataLists = {depots:[], schemes:[]};
+let dataLists = { depots: [], schemes: [] };
 let allocations = [];
-let lastFlagged = [];
 
-let firebaseApp = null;
-let firebaseDb = null;
-let firebaseConnected = false;
-let autoSync = false;
-
-/* ---------- Embedded Firebase config (optional) ---------- */
-// If you want auto-connect on load, paste here. Otherwise leave empty and paste in textarea and press Connect.
-const EMBEDDED_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
-  authDomain: "depot-validator-live.firebaseapp.com",
-  databaseURL: "https://depot-validator-live-default-rtdb.firebaseio.com",
-  projectId: "depot-validator-live",
-  storageBucket: "depot-validator-live.firebasestorage.app",
-  messagingSenderId: "1074593440181",
-  appId: "1:1074593440181:web:3968750c009a604f3379fc",
-  measurementId: "G-R0WRV6PD26"
-};
-
-/* ---------- Helpers ---------- */
-function toFixed6Number(v){
-  const n = Number(v || 0);
-  if (!isFinite(n)) return 0;
-  return Number(n.toFixed(6));
-}
-function formatQty(v){ const n = Number(v || 0); if (!isFinite(n)) return '0.000000'; return n.toFixed(6); }
-function loadDataLists(){ try { const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : {depots:[], schemes:[]}; } catch(e){ console.warn('loadDataLists failed', e); dataLists = {depots:[], schemes:[]}; } }
-function saveDataLists(){ try { localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && autoSync) pushDataListsToFirebase(); } catch(e){ console.warn('saveDataLists failed', e); } }
-function loadAllocations(){ try { const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); } catch(e){ console.warn('loadAllocations failed', e); allocations = []; } }
-function saveAllocations(){ try { localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && autoSync) pushAllocationsToFirebase(); } catch(e){ console.warn('saveAllocations failed', e); } }
-function normStr(s){ if (s===null||s===undefined) return ''; return String(s).replace(/\u00A0/g,' ').trim().replace(/\s+/g,' '); }
-function esc(s){ return s===undefined||s===null?'':String(s).replace(/[&<>"'`]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[m]); }
-function toNumber(v){ const n = Number(String(v || '').replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
-
-/* ---------- Parsing XLSM / wide / xml ---------- */
-function colIndexToLetter(index){ let s=''; let i=index; while(i>=0){ s = String.fromCharCode((i%26)+65) + s; i = Math.floor(i/26) - 1; } return s; }
-function parseXlsmOfftake(wb){
-  const first = wb.SheetNames[0];
-  const ws = wb.Sheets[first];
-  if (!ws) return [];
-  const cellVal = (col,row) => { const addr = col + row; const cell = ws[addr]; if (!cell) return ''; const v = (cell.v !== undefined && cell.v !== null) ? cell.v : (cell.w !== undefined ? cell.w : ''); return v===null? '' : String(v).trim(); };
-  const headerRow = 1;
-  const b1 = cellVal('B', headerRow) || '';
-  const b1Lower = String(b1).trim().toLowerCase();
-  let commodityCol = null;
-  let schemeStartColIndex = 1; // B
-  if (b1Lower.includes('commodity')) { commodityCol = 'B'; schemeStartColIndex = 2; }
-  const schemes = [];
-  let cidx = schemeStartColIndex;
-  while(true){
-    const col = colIndexToLetter(cidx);
-    const header = cellVal(col, headerRow);
-    if (header && String(header).trim().toLowerCase() === 'total') break;
-    if (header !== '') schemes.push({ col, name: normStr(header || '') });
-    cidx++; if (cidx > 500) break;
-  }
-  const records = [];
-  let r = 2;
-  while(true){
-    const depotCell = cellVal('A', r);
-    if (!depotCell || String(depotCell).trim() === '') break;
-    const depot = normStr(depotCell);
-    const commodityVal = commodityCol ? normStr(cellVal(commodityCol, r) || '') : '';
-    for (const s of schemes){
-      const raw = cellVal(s.col, r);
-      if (raw !== '' && raw !== null && raw !== undefined) {
-        const qty = toNumber(raw);
-        if (qty !== 0) records.push({ depot, commodity: commodityVal || '', scheme: s.name, issued_amount: qty });
-      }
-    }
-    r++; if (r > 20000) break;
-  }
-  return records;
-}
-function parseXmlStringToRecords(xmlString){
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlString, 'application/xml');
-  if (doc.querySelector('parsererror')) throw new Error('Invalid XML');
-  const root = doc.documentElement;
-  let nodes = Array.from(root.children);
-  const names = nodes.map(n=>n.tagName);
-  const freq = {}; names.forEach(n=>freq[n]=(freq[n]||0)+1);
-  for (const k in freq) if (freq[k] > 1) { nodes = Array.from(root.getElementsByTagName(k)); break; }
-  const recs = nodes.map(n=>{
-    const obj = {};
-    Array.from(n.children).forEach(ch => obj[ch.tagName.toLowerCase()] = (ch.textContent||'').trim());
-    return obj;
-  }).filter(r => Object.keys(r).length > 0);
-  return recs;
-}
-function readFileToJson(file){
-  return new Promise((resolve,reject) => {
-    const name = (file.name || '').toLowerCase();
-    if (name.endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml') {
-      const fr = new FileReader();
-      fr.onerror = ()=>reject(new Error('file read error'));
-      fr.onload = e => { try { const recs = parseXmlStringToRecords(e.target.result); resolve(recs); } catch(err){ reject(err); } };
-      fr.readAsText(file); return;
-    }
-    const fr = new FileReader();
-    fr.onerror = ()=>reject(new Error('file read error'));
-    fr.onload = e => {
-      const data = e.target.result;
-      try {
-        const arr = (data instanceof ArrayBuffer) ? new Uint8Array(data) : data;
-        const wb = XLSX.read(arr, { type: 'array', cellDates: true });
-        if (name.endsWith('.xlsm')) { const recs = parseXlsmOfftake(wb); resolve(recs); return; }
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        let json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        if (json && json.length > 0) {
-          const headers = Object.keys(json[0]);
-          const depotHeader = headers.find(h => h.toLowerCase().includes('depot'));
-          const totalHeaderIndex = headers.findIndex(h => h.toLowerCase().trim() === 'total' || h.toLowerCase().includes('total'));
-          const commodityHeaderIndex = headers.findIndex(h => h.toLowerCase().includes('commodity'));
-          if (depotHeader && totalHeaderIndex !== -1) {
-            let schemeHeaders = [];
-            if (commodityHeaderIndex !== -1 && commodityHeaderIndex < totalHeaderIndex) {
-              schemeHeaders = headers.slice(commodityHeaderIndex + 1, totalHeaderIndex);
-              const pivoted = [];
-              for (const row of json) {
-                const depotVal = normStr(row[depotHeader] ?? '');
-                if (!depotVal) continue;
-                const commodityVal = normStr(row[headers[commodityHeaderIndex]] ?? '');
-                for (const sh of schemeHeaders) {
-                  const rawVal = row[sh];
-                  if (rawVal !== '' && rawVal !== null && rawVal !== undefined) {
-                    const qty = toNumber(rawVal);
-                    if (qty !== 0) pivoted.push({ depot: depotVal, commodity: commodityVal || '', scheme: normStr(sh), issued_amount: qty });
-                  }
-                }
-              }
-              if (pivoted.length > 0) { resolve(pivoted); return; }
-            } else {
-              const schemeHeaders2 = headers.filter(h => h !== depotHeader && (totalHeaderIndex === -1 || h !== headers[totalHeaderIndex]));
-              const pivoted2 = [];
-              for (const row of json) {
-                const depotVal = normStr(row[depotHeader] ?? '');
-                if (!depotVal) continue;
-                for (const sh of schemeHeaders2) {
-                  if (sh === headers[totalHeaderIndex]) continue;
-                  const rawVal = row[sh];
-                  if (rawVal !== '' && rawVal !== null && rawVal !== undefined) {
-                    const qty = toNumber(rawVal);
-                    if (qty !== 0) pivoted2.push({ depot: depotVal, scheme: normStr(sh), issued_amount: qty });
-                  }
-                }
-              }
-              if (pivoted2.length > 0) { resolve(pivoted2); return; }
-            }
-          }
-        }
-        resolve(json);
-      } catch (err) {
-        try {
-          const wb = XLSX.read(data, { type: 'binary', cellDates: true });
-          if (name.endsWith('.xlsm')) { const recs = parseXlsmOfftake(wb); resolve(recs); return; }
-          const ws = wb.Sheets[wb.SheetNames[0]]; const json = XLSX.utils.sheet_to_json(ws, { defval: '' }); resolve(json);
-        } catch (err2) { reject(err2 || err); }
-      }
+function loadDataLists(){
+  try {
+    const raw = localStorage.getItem(DATA_KEY);
+    const parsed = raw ? JSON.parse(raw) : { depots: [], schemes: [] };
+    if (!parsed || typeof parsed !== 'object') throw "bad";
+    dataLists = {
+      depots: Array.isArray(parsed.depots) ? parsed.depots : [],
+      schemes: Array.isArray(parsed.schemes) ? parsed.schemes : []
     };
-    if (FileReader.prototype.readAsArrayBuffer) fr.readAsArrayBuffer(file); else fr.readAsBinaryString(file);
+  } catch { dataLists = { depots: [], schemes: [] }; }
+}
+function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); }
+
+function loadAllocations(){
+  try {
+    const raw = localStorage.getItem(ALLOC_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    allocations = Array.isArray(parsed) ? parsed : [];
+  } catch { allocations = []; }
+}
+function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); }
+
+/* Safe populate */
+function populateSelects(){
+  if (!dataLists || typeof dataLists !== 'object') dataLists = { depots: [], schemes: [] };
+  if (!Array.isArray(dataLists.depots)) dataLists.depots = [];
+  if (!Array.isArray(dataLists.schemes)) dataLists.schemes = [];
+  const depotSel = document.getElementById('depotSelect');
+  const schemeSel = document.getElementById('schemeSelect');
+  depotSel.innerHTML = '<option value="">-- select depot --</option>';
+  schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
+  dataLists.depots.forEach(d => depotSel.insertAdjacentHTML('beforeend', `<option>${d}</option>`));
+  dataLists.schemes.forEach(s => schemeSel.insertAdjacentHTML('beforeend', `<option>${s}</option>`));
+}
+
+/* Render lists */
+function renderDataLists(){
+  const depotListEl = document.getElementById('depotList');
+  depotListEl.innerHTML = '';
+  dataLists.depots.forEach((d,i)=> depotListEl.insertAdjacentHTML('beforeend', `<li>${d} <button onclick="deleteDepot(${i})">x</button></li>`));
+  const schemeListEl = document.getElementById('schemeList');
+  schemeListEl.innerHTML = '';
+  dataLists.schemes.forEach((s,i)=> schemeListEl.insertAdjacentHTML('beforeend', `<li>${s} <button onclick="deleteScheme(${i})">x</button></li>`));
+}
+
+function deleteDepot(i){ dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+function deleteScheme(i){ dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+
+/* Render allocations */
+function renderAllocTable(){
+  const tbody = document.querySelector('#allocTable tbody');
+  tbody.innerHTML = '';
+  allocations.forEach((a,i)=>{
+    const bal = (Number(a.allocated||0)-Number(a.issued||0)).toFixed(6);
+    tbody.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td><td>${a.depot}</td><td>${a.scheme}</td><td>${a.commodity}</td><td>${a.ro}</td><td>${(a.allocated||0).toFixed?.(6) || a.allocated}</td><td>${(a.issued||0).toFixed?.(6) || a.issued}</td><td>${bal}</td><td>${a.remarks||''}</td></tr>`);
   });
 }
 
-/* ---------- Validation + FIFO apply ---------- */
-function findKey(keys,cands){ const low = keys.map(k=>k.toLowerCase()); for (const c of cands){ const idx = low.indexOf(c); if (idx !== -1) return keys[idx]; } for (let i=0;i<low.length;i++){ for (const c of cands) if (low[i].includes(c)) return keys[i]; } return null; }
+/* Events */
+document.getElementById('addDepotBtn').onclick = ()=>{ const v=document.getElementById('newDepot').value.trim(); if(v && !dataLists.depots.includes(v)){ dataLists.depots.push(v); saveDataLists(); renderDataLists(); populateSelects(); } document.getElementById('newDepot').value=''; };
+document.getElementById('addSchemeBtn').onclick = ()=>{ const v=document.getElementById('newScheme').value.trim(); if(v && !dataLists.schemes.includes(v)){ dataLists.schemes.push(v); saveDataLists(); renderDataLists(); populateSelects(); } document.getElementById('newScheme').value=''; };
+document.getElementById('addAllocBtn').onclick = ()=>{ const depot=document.getElementById('depotSelect').value; const scheme=document.getElementById('schemeSelect').value; const commodity=document.getElementById('commoditySelect').value; const ro=document.getElementById('roInput').value; const qty=Number(document.getElementById('qtyInput').value)||0; if(!depot||!scheme) return alert('Select depot and scheme'); allocations.push({ depot, scheme, commodity, ro, allocated: qty, issued: 0, remarks:'' }); saveAllocations(); renderAllocTable(); };
 
-document.getElementById('portalFile').addEventListener('change', (e)=>{ const f = e.target.files[0]; document.getElementById('portalFileName').innerText = f ? f.name : ''; });
+document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active'); document.querySelectorAll('.tabpanel').forEach(p=>p.style.display='none'); document.getElementById(btn.dataset.tab).style.display='block'; });
 
-document.getElementById('validateBtn').addEventListener('click', async ()=> {
-  try {
-    const f = document.getElementById('portalFile').files[0];
-    if (!f) return alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)');
-    document.getElementById('validateStatus').innerText = 'Extracting data from file...';
-    let rows;
-    try { rows = await readFileToJson(f); } catch(err){ console.error(err); alert('Read failed: ' + (err && err.message ? err.message : 'unknown')); document.getElementById('validateStatus').innerText=''; return; }
-    if (!rows || rows.length === 0) { alert('No rows extracted'); document.getElementById('validateStatus').innerText=''; return; }
-    // detect keys
-    let depotKey, schemeKey, qtyKey, commodityKey;
-    if (f.name.toLowerCase().endsWith('.xlsm') || (rows[0].hasOwnProperty('depot') && rows[0].hasOwnProperty('scheme') && rows[0].hasOwnProperty('issued_amount'))) {
-      depotKey = 'depot'; schemeKey = 'scheme'; qtyKey = 'issued_amount';
-      if (rows[0].hasOwnProperty('commodity')) commodityKey = 'commodity';
-    } else {
-      const keys = Object.keys(rows[0]);
-      depotKey = findKey(keys, ['depot','depotname','depot_name']);
-      schemeKey = findKey(keys, ['scheme','schemename','scheme_name']);
-      qtyKey = findKey(keys, ['issued_amount','issued','qty','quantity','amount','lifted','liftedquantity']);
-      commodityKey = findKey(keys, ['commodity','commodityname','commodity_name','comm']);
-    }
-    if (!depotKey || !schemeKey || !qtyKey) {
-      alert('File must contain Depot, Scheme and Issued/Quantity fields (could not detect automatically).');
-      document.getElementById('validateStatus').innerText = 'Key detection failed.'; return;
-    }
-
-    loadAllocations();
-    const applied = [], flagged = [];
-    const useDate = document.getElementById('dateBehavior').value === 'useDate';
-    const nowISO = new Date().toISOString();
-    const lastIssuedMap = {};
-
-    for (const rec of rows) {
-      const rawDepot = normStr(rec[depotKey] ?? '');
-      const rawScheme = normStr(rec[schemeKey] ?? '');
-      const rawQty = toNumber(rec[qtyKey]);
-      const rawCommodity = commodityKey ? normStr(rec[commodityKey] ?? '') : '';
-      if (!rawDepot || !rawScheme) continue;
-      if (rawQty === 0) continue;
-      let matches = allocations.map((a, idx) => ({ ...a, __idx: idx })).filter(x => x.depot === rawDepot && x.scheme === rawScheme);
-      if (rawCommodity) matches = matches.filter(x => String(x.commodity || '').toLowerCase() === String(rawCommodity || '').toLowerCase());
-      if (!matches || matches.length === 0) {
-        const reason = rawCommodity ? 'No allocation for depot+scheme+commodity' : 'No allocation for depot+scheme';
-        flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, reason });
-        continue;
-      }
-      matches.sort((a,b) => { const na = Number(a.ro), nb = Number(b.ro); if (!isNaN(na) && !isNaN(nb)) return na - nb; if (!isNaN(na) && isNaN(nb)) return -1; if (isNaN(na) && !isNaN(nb)) return 1; return a.__idx - b.__idx; });
-      let remaining = rawQty;
-      for (const m of matches){
-        if (remaining <= 0) break;
-        const idx = m.__idx;
-        const alloc = allocations[idx];
-        const avail = toFixed6Number(toNumber(alloc.allocated) - toNumber(alloc.issued));
-        if (avail <= 0) continue;
-        const consumeRaw = Math.min(avail, remaining);
-        const consume = toFixed6Number(consumeRaw);
-        allocations[idx].issued = toFixed6Number(toNumber(allocations[idx].issued) + consume);
-        const ts = useDate && rec.date ? rec.date : nowISO;
-        lastIssuedMap[idx] = ts;
-        remaining = toFixed6Number(remaining - consume);
-      }
-      if (remaining > 0) {
-        flagged.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty, leftover: remaining, reason: `Issued ${rawQty} exceeded available by ${remaining}` });
-      } else {
-        applied.push({ depot: rawDepot, scheme: rawScheme, commodity: rawCommodity || '', issued_amount: rawQty });
-      }
-    }
-
-    // cap and postprocess
-    for (let i=0;i<allocations.length;i++){
-      const a = allocations[i];
-      if (toNumber(a.issued) >= toNumber(a.allocated)) {
-        a.issued = toFixed6Number(a.allocated);
-        a.remarks = a.allocated > 0 ? 'RO Completed' : a.remarks || '';
-      } else if (toNumber(a.issued) > 0) {
-        a.remarks = 'Partially used';
-        a.issued = toFixed6Number(a.issued);
-      } else {
-        a.remarks = '';
-        a.issued = toFixed6Number(a.issued);
-      }
-      if (lastIssuedMap[i]) a.lastIssued = lastIssuedMap[i];
-    }
-
-    saveAllocations();
-    lastFlagged = flagged;
-    document.getElementById('validateStatus').innerText = `Done. Applied: ${applied.length}, Flagged: ${flagged.length}`;
-    document.getElementById('downloadFlagged').disabled = flagged.length === 0;
-    renderAllocTable(); renderFlagged(); renderReport();
-  } catch(err){
-    console.error('Validation error', err);
-    alert('Validation failed: ' + (err && err.message ? err.message : 'unknown'));
-    document.getElementById('validateStatus').innerText = 'Validation failed';
-  }
-});
-
-/* ---------- UI Render & Wiring ---------- */
-function populateSelects(){
-  try {
-    const depotSel = document.getElementById('depotSelect');
-    const schemeSel = document.getElementById('schemeSelect');
-    if (!depotSel || !schemeSel) return;
-    depotSel.innerHTML = '<option value="">-- select depot --</option>';
-    schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
-    (dataLists.depots || []).forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
-    (dataLists.schemes || []).forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
-  } catch(e){ console.warn('populateSelects failed', e); }
-}
-
-function renderDataLists(){
-  try {
-    const depotListEl = document.getElementById('depotList'); if (!depotListEl) return; depotListEl.innerHTML='';
-    (dataLists.depots || []).forEach((d,i)=>{ const el = document.createElement('div'); el.className='list-item'; el.innerHTML = `<div>${esc(d)}</div><div class="list-actions"><button class="btn" data-type="edit-depot" data-i="${i}">Edit</button><button class="btn" data-type="del-depot" data-i="${i}">Delete</button></div>`; depotListEl.appendChild(el); });
-    const schemeListEl = document.getElementById('schemeList'); if (!schemeListEl) return; schemeListEl.innerHTML='';
-    (dataLists.schemes || []).forEach((s,i)=>{ const el = document.createElement('div'); el.className='list-item'; el.innerHTML = `<div>${esc(s)}</div><div class="list-actions"><button class="btn" data-type="edit-scheme" data-i="${i}">Edit</button><button class="btn" data-type="del-scheme" data-i="${i}">Delete</button></div>`; schemeListEl.appendChild(el); });
-  } catch(e){ console.warn('renderDataLists failed', e); }
-}
-
-document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newDepot').value); if(!v) return alert('Type depot name'); if(!dataLists.depots.includes(v)) dataLists.depots.push(v); document.getElementById('newDepot').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
-document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
-
-document.addEventListener('click', (e)=>{
-  try {
-    const t = e.target;
-    if (!t) return;
-    if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
-    if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
-    if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
-    if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
-
-    if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
-    if (t.classList && t.classList.contains('edit-alloc')){
-      const i = Number(t.dataset.i);
-      const a = allocations[i];
-      const newAlloc = prompt('Edit allocated qty (6 decimals)', formatQty(a.allocated));
-      if (newAlloc !== null){
-        const v = toFixed6Number(newAlloc);
-        allocations[i].allocated = v;
-        if (toNumber(allocations[i].issued) > toNumber(allocations[i].allocated)) allocations[i].issued = toFixed6Number(allocations[i].allocated);
-        if (allocations[i].issued === 0) allocations[i].remarks = '';
-        else if (toNumber(allocations[i].issued) >= toNumber(allocations[i].allocated)) allocations[i].remarks = 'RO Completed';
-        else allocations[i].remarks = 'Partially used';
-        saveAllocations(); renderAllocTable(); renderReport();
-      }
-    }
-  } catch(err){ console.warn('click handler error', err); }
-});
-
-document.getElementById('addAllocBtn').addEventListener('click', ()=> {
-  try {
-    const depot = document.getElementById('depotSelect').value;
-    const scheme = document.getElementById('schemeSelect').value;
-    const commodity = document.getElementById('commoditySelect').value;
-    const ro = document.getElementById('roInput').value.trim();
-    const qtyRaw = document.getElementById('qtyInput').value;
-    const qty = toFixed6Number(qtyRaw);
-    if (!depot) return alert('Select depot from Data tab first');
-    if (!scheme) return alert('Select scheme from Data tab first');
-    if (isNaN(qty) || qty < 0) return alert('Enter valid Qty (>= 0)');
-    allocations.push({ depot, scheme, commodity, ro, allocated: qty, issued: toFixed6Number(0), lastIssued: '', remarks: '' });
-    saveAllocations();
-    renderAllocTable();
-    renderReport();
-    document.getElementById('roInput').value = '';
-    document.getElementById('qtyInput').value = '';
-  } catch(err){ console.warn('addAlloc error', err); }
-});
-
-function renderAllocTable(){
-  try {
-    loadAllocations();
-    const tbody = document.querySelector('#allocTable tbody'); if (!tbody) return; tbody.innerHTML = '';
-    allocations.forEach((a,i)=>{
-      const balance = toFixed6Number(toNumber(a.allocated) - toNumber(a.issued));
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${i+1}</td><td>${esc(a.depot)}</td><td>${esc(a.scheme)}</td><td>${esc(a.commodity)}</td><td>${esc(a.ro)}</td><td>${formatQty(a.allocated)}</td><td>${formatQty(a.issued)}</td><td>${formatQty(balance)}</td><td>${a.lastIssued?new Date(a.lastIssued).toLocaleString():'-'}</td><td>${esc(a.remarks||'')}</td><td><button class="btn edit-alloc" data-i="${i}">Edit</button> <button class="btn del-alloc" data-i="${i}">Delete</button></td>`;
-      tbody.appendChild(tr);
-    });
-  } catch(err){ console.warn('renderAllocTable failed', err); }
-}
-
-function renderFlagged(){
-  try {
-    const area = document.getElementById('flaggedArea'); if (!area) return; area.innerHTML = '';
-    if (!lastFlagged || lastFlagged.length === 0){ area.innerHTML = '<div class="small">No flagged transactions.</div>'; return; }
-    let html = '<table><thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>Issued</th><th>Leftover</th><th>Reason</th></tr></thead><tbody>';
-    lastFlagged.forEach((f,i)=>{ html += `<tr><td>${i+1}</td><td>${esc(f.depot)}</td><td>${esc(f.scheme)}</td><td>${esc(f.commodity||'')}</td><td>${formatQty(f.issued_amount)}</td><td>${f.leftover?formatQty(f.leftover):''}</td><td>${esc(f.reason)}</td></tr>`; });
-    html += '</tbody></table>'; area.innerHTML = html;
-  } catch(err){ console.warn('renderFlagged failed', err); }
-}
-
-function renderReport(){
-  try {
-    const tbody = document.querySelector('#reportTable tbody'); if (!tbody) return; tbody.innerHTML = '';
-    const map = {};
-    allocations.forEach(a=>{
-      const key = `${a.depot}||${a.scheme}||${a.ro}`;
-      if (!map[key]) map[key] = { depot:a.depot, scheme:a.scheme, ro:a.ro, allocated:0, issued:0, lastIssued: a.lastIssued || '' , commodity: a.commodity || ''};
-      map[key].allocated = toFixed6Number(toNumber(map[key].allocated) + toNumber(a.allocated));
-      map[key].issued = toFixed6Number(toNumber(map[key].issued) + toNumber(a.issued));
-      if (a.lastIssued) map[key].lastIssued = a.lastIssued;
-    });
-    Object.keys(map).forEach((k,i)=>{ const r = map[k]; const bal = toFixed6Number(toNumber(r.allocated) - toNumber(r.issued)); const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${esc(r.depot)}</td><td>${esc(r.scheme)}</td><td>${esc(r.ro)}</td><td>${formatQty(r.allocated)}</td><td>${formatQty(r.issued)}</td><td>${formatQty(bal)}</td><td>${r.lastIssued?new Date(r.lastIssued).toLocaleString():'-'}</td>`; tbody.appendChild(tr); });
-  } catch(err){ console.warn('renderReport failed', err); }
-}
-
-/* ---------- Downloads ---------- */
-function downloadXlsx(name,json){
-  try {
-    const ws = XLSX.utils.json_to_sheet(json);
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'sheet1');
-    const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-    const blob = new Blob([wbout], { type:'application/octet-stream' });
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
-  } catch(err){ console.warn('downloadXlsx failed', err); alert('Download failed'); }
-}
-document.getElementById('downloadReport').addEventListener('click', ()=>{ try {
-  const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated = toFixed6Number(toNumber(map[k].allocated) + toNumber(a.allocated)); map[k].issued = toFixed6Number(toNumber(map[k].issued) + toNumber(a.issued)); }); const arr = Object.keys(map).map(k=>{ const r = map[k]; return { depot: r.depot, scheme: r.scheme, ro: r.ro, commodity: r.commodity, allocated: formatQty(r.allocated), issued: formatQty(r.issued), balance: formatQty(toFixed6Number(toNumber(r.allocated)-toNumber(r.issued))), lastIssued: r.lastIssued }; }); downloadXlsx('depot_scheme_report.xlsx', arr);
-} catch(err){ console.warn('downloadReport error', err); }});
-document.getElementById('downloadFlagged').addEventListener('click', ()=>{ try {
-  if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason })); downloadXlsx('flagged_transactions.xlsx', arr);
-} catch(err){ console.warn('downloadFlagged error', err); }});
-
-/* ---------- Firebase Live Sync (optional) ---------- */
-function connectFirebaseWithConfig(cfg){
-  try {
-    if (!cfg) throw new Error('No config');
-    if (firebaseApp && firebaseApp.delete) { try { firebaseApp.delete(); } catch(_){} }
-    firebaseApp = firebase.initializeApp(cfg);
-    firebaseDb = firebase.database();
-    firebaseConnected = true;
-    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (Realtime DB).';
-    document.getElementById('pushFirebase').disabled = false;
-    document.getElementById('pullFirebase').disabled = false;
-  } catch(err){
-    firebaseConnected = false;
-    document.getElementById('firebaseStatus').innerText = 'Firebase init failed: ' + (err && err.message ? err.message : err);
-    console.warn('connectFirebaseWithConfig failed', err);
-  }
-}
-
-// prefill textarea with embedded config (for convenience) but do NOT auto-initialize
-try { document.getElementById('firebaseConfig').value = JSON.stringify(EMBEDDED_FIREBASE_CONFIG, null, 2); } catch(_) {}
-
-document.getElementById('connectFirebase').addEventListener('click', ()=> {
-  const txt = document.getElementById('firebaseConfig').value.trim();
-  if (!txt) return alert('Paste your Firebase config JSON first (from Project Settings).');
-  let cfg;
-  try { cfg = JSON.parse(txt); } catch(e){ return alert('Invalid JSON'); }
-  connectFirebaseWithConfig(cfg);
-});
-
-document.getElementById('pushFirebase').addEventListener('click', ()=> {
-  if (!firebaseConnected || !firebaseDb) return alert('Connect Firebase first.');
-  try {
-    firebaseDb.ref('/'+DATA_KEY).set(dataLists).then(()=>{ document.getElementById('firebaseStatus').innerText = 'Data lists pushed.' }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Push failed: '+err.message });
-    firebaseDb.ref('/'+ALLOC_KEY).set(allocations).then(()=>{ document.getElementById('firebaseStatus').innerText = 'Allocations pushed.' }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Push failed: '+err.message });
-  } catch(err){ console.warn('pushFirebase error', err); alert('Push failed'); }
-});
-
-document.getElementById('pullFirebase').addEventListener('click', ()=> {
-  if (!firebaseConnected || !firebaseDb) return alert('Connect Firebase first.');
-  document.getElementById('firebaseStatus').innerText = 'Pulling...';
-  firebaseDb.ref('/'+DATA_KEY).once('value').then(snap=>{
-    const val = snap.val();
-    if (val) { dataLists = val; saveDataLists(); renderDataLists(); populateSelects(); document.getElementById('firebaseStatus').innerText = 'Pulled data lists.'; }
-    return firebaseDb.ref('/'+ALLOC_KEY).once('value');
-  }).then(snap2=>{
-    const val2 = snap2.val();
-    if (val2) { allocations = (Array.isArray(val2) ? val2 : Object.values(val2)).map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); saveAllocations(); renderAllocTable(); renderReport(); document.getElementById('firebaseStatus').innerText = 'Pulled allocations.'; }
-  }).catch(err=>{ document.getElementById('firebaseStatus').innerText = 'Pull failed: '+err.message; });
-});
-
-document.getElementById('autoSync').addEventListener('change', (e)=>{ autoSync = e.target.checked; });
-
-/* ---------- Init & Tabs ---------- */
-try {
-  loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
-} catch(err){ console.warn('startup error', err); }
-
-(function wireTabs(){
-  try {
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(btn => {
-      btn.addEventListener('click', ()=> {
-        tabs.forEach(t=>t.classList.remove('active'));
-        btn.classList.add('active');
-        const tab = btn.dataset.tab;
-        document.querySelectorAll('.tabpanel').forEach(p=>p.style.display='none');
-        const panel = document.getElementById(tab);
-        if (panel) panel.style.display = 'block';
-        if (tab === 'alloc') renderAllocTable();
-        if (tab === 'report') renderReport();
-        if (tab === 'data') renderDataLists();
-      });
-    });
-    // default
-    tabs.forEach(t=>t.classList.remove('active'));
-    const defaultBtn = document.querySelector('[data-tab="alloc"]');
-    if (defaultBtn) defaultBtn.classList.add('active');
-    const allocPanel = document.getElementById('alloc');
-    if (allocPanel) allocPanel.style.display = 'block';
-  } catch(err){ console.warn('wireTabs failed', err); }
-})();
+/* Init */
+loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable();
 </script>
 </body>
 </html>
