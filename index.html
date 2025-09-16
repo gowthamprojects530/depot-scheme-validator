@@ -96,37 +96,7 @@
       </div>
     </div>
 
-    <div class="live-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div>
-          <strong>Go Live (Free)</strong><br>
-          <div class="small" style="margin-top:6px">Host this file on GitHub Pages and use Firebase Realtime Database (free Spark tier) for online storage.</div>
-        </div>
-        <div class="chip">Free: GitHub Pages + Firebase</div>
-      </div>
 
-      <div style="margin-top:12px">
-        <div class="small muted-note">Paste Firebase config below (from Firebase Console → Project Settings → SDK) then <strong>Connect</strong>. After connecting you can Push local data or Pull from Firebase. Toggle "Auto sync" to push automatically.</div>
-        <textarea id="firebaseConfig" placeholder='Paste your Firebase config JSON here (eg {"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...", ...})'>{
-  "apiKey": "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
-  "authDomain": "depot-validator-live.firebaseapp.com",
-  "databaseURL": "https://depot-validator-live-default-rtdb.firebaseio.com",
-  "projectId": "depot-validator-live",
-  "storageBucket": "depot-validator-live.firebasestorage.app",
-  "messagingSenderId": "1074593440181",
-  "appId": "1:1074593440181:web:1c156d92cc3303513379fc",
-  "measurementId": "G-J17RNGS230"
-}</textarea>
-        <div style="margin-top:8px" class="flex">
-          <button id="connectFirebase" class="btn primary">Connect</button>
-          <button id="pushFirebase" class="btn" disabled>Push to Firebase</button>
-          <button id="pullFirebase" class="btn" disabled>Pull from Firebase</button>
-          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoSync" type="checkbox" /> Auto sync on change</label>
-        </div>
-        <div id="firebaseStatus" class="small" style="margin-top:8px"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- ALLOCATIONS TAB -->
   <div id="alloc" class="card tabpanel" role="tabpanel">
@@ -723,3 +693,4 @@ document.getElementById('alloc').style.display = 'block';
 </script>
 </body>
 </html>
+
