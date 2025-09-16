@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Local (stable)</title>
+<title>Depot Scheme Validator — Local Stable (fixed)</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -49,8 +49,8 @@
 <div class="container">
   <header>
     <div>
-      <h1>Depot Scheme Validator — Local Stable</h1>
-      <div class="sub">No network — defensive mode · 6-decimal quantities</div>
+      <h1>Depot Scheme Validator — Local (fixed)</h1>
+      <div class="sub">No network · Defensive mode · 6-decimal quantities</div>
     </div>
     <div class="small">Local only</div>
   </header>
@@ -185,7 +185,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
-/* ---------- Local-only safe app ---------- */
+/* ---------- Local-only safe app (fixed for dataLists undefined) ---------- */
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
 
@@ -223,10 +223,44 @@ function toFixed6Number(v){
 function fmt(v){ return toFixed6Number(v).toFixed(6); }
 function toNumber(v){ const n = Number(String(v||'').replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 
-/* ---------- Storage helpers ---------- */
-function loadDataLists(){ try{ const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : { depots: [], schemes: [] }; }catch(e){ dataLists = {depots:[], schemes:[]}; errorLog('loadDataLists failed: '+ e.message); } }
+/* ---------- Storage helpers (now defensive) ---------- */
+function loadDataLists(){
+  try{
+    const raw = localStorage.getItem(DATA_KEY);
+    if (!raw) { dataLists = { depots: [], schemes: [] }; return; }
+    const parsed = JSON.parse(raw);
+    // ensure shape
+    if (!parsed || typeof parsed !== 'object') { dataLists = { depots: [], schemes: [] }; return; }
+    dataLists = {
+      depots: Array.isArray(parsed.depots) ? parsed.depots.slice() : [],
+      schemes: Array.isArray(parsed.schemes) ? parsed.schemes.slice() : []
+    };
+  } catch(e){
+    dataLists = { depots: [], schemes: [] };
+    errorLog('loadDataLists failed: '+ e.message);
+  }
+}
 function saveDataLists(){ try{ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); log('Saved data lists to localStorage'); } catch(e){ errorLog('saveDataLists failed: '+ e.message); } }
-function loadAllocations(){ try{ const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated: toFixed6Number(a.allocated||0), issued: toFixed6Number(a.issued||0), lastIssued: a.lastIssued||'', remarks: a.remarks||'' })); } catch(e){ allocations = []; errorLog('loadAllocations failed: '+ e.message); } }
+function loadAllocations(){
+  try{
+    const raw = localStorage.getItem(ALLOC_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) { allocations = []; return; }
+    allocations = arr.map(a=>({
+      depot: a.depot || '',
+      scheme: a.scheme || '',
+      commodity: a.commodity || 'Rice',
+      ro: a.ro || '',
+      allocated: toFixed6Number(a.allocated || 0),
+      issued: toFixed6Number(a.issued || 0),
+      lastIssued: a.lastIssued || '',
+      remarks: a.remarks || ''
+    }));
+  } catch(e){
+    allocations = [];
+    errorLog('loadAllocations failed: '+ e.message);
+  }
+}
 function saveAllocations(){ try{ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); log('Saved allocations to localStorage'); } catch(e){ errorLog('saveAllocations failed: '+ e.message); } }
 
 /* ---------- Utility ---------- */
@@ -390,10 +424,10 @@ document.getElementById('validateBtn').addEventListener('click', async ()=>{
   document.getElementById('validateStatus').innerText = 'Extracting data...';
   try {
     const f = document.getElementById('portalFile').files[0];
-    if (!f) { alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)'); return; }
+    if (!f) { alert('Choose portal export file (.xml/.csv/.xlsx/.xls,.xlsm)'); btn.disabled = false; return; }
     let rows;
-    try { rows = await readFileToJson(f); log('Extracted rows: ' + (rows ? rows.length : 0)); } catch(err){ errorLog('Read failed: ' + (err && err.message ? err.message : err)); document.getElementById('validateStatus').innerText = ''; return; }
-    if (!rows || rows.length === 0) { alert('No rows extracted'); document.getElementById('validateStatus').innerText = ''; return; }
+    try { rows = await readFileToJson(f); log('Extracted rows: ' + (rows ? rows.length : 0)); } catch(err){ errorLog('Read failed: ' + (err && err.message ? err.message : err)); document.getElementById('validateStatus').innerText = ''; btn.disabled = false; return; }
+    if (!rows || rows.length === 0) { alert('No rows extracted'); document.getElementById('validateStatus').innerText = ''; btn.disabled = false; return; }
 
     // detect keys
     let depotKey, schemeKey, qtyKey, commodityKey;
@@ -410,6 +444,7 @@ document.getElementById('validateBtn').addEventListener('click', async ()=>{
     if (!depotKey || !schemeKey || !qtyKey) {
       alert('File must contain Depot, Scheme and Issued/Quantity fields (could not detect).');
       document.getElementById('validateStatus').innerText = 'Key detection failed.';
+      btn.disabled = false;
       return;
     }
 
@@ -504,85 +539,114 @@ document.getElementById('validateBtn').addEventListener('click', async ()=>{
   }
 });
 
-/* ---------- UI and storage wiring ---------- */
+/* ---------- UI and storage wiring (defensive) ---------- */
+
 function populateSelects(){
-  const depotSel = document.getElementById('depotSelect');
-  const schemeSel = document.getElementById('schemeSelect');
-  depotSel.innerHTML = '<option value="">-- select depot --</option>';
-  schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
-  dataLists.depots.forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
-  dataLists.schemes.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
+  try {
+    // ensure dataLists shape
+    if (!dataLists || typeof dataLists !== 'object') dataLists = { depots: [], schemes: [] };
+    if (!Array.isArray(dataLists.depots)) dataLists.depots = [];
+    if (!Array.isArray(dataLists.schemes)) dataLists.schemes = [];
+
+    const depotSel = document.getElementById('depotSelect');
+    const schemeSel = document.getElementById('schemeSelect');
+    depotSel.innerHTML = '<option value="">-- select depot --</option>';
+    schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
+    dataLists.depots.forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
+    dataLists.schemes.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
+  } catch(e){
+    errorLog('populateSelects failed: ' + (e && e.message ? e.message : String(e)));
+  }
 }
 
 function renderDataLists(){
-  const depotListEl = document.getElementById('depotList'); depotListEl.innerHTML='';
-  dataLists.depots.forEach((d,i)=>{ const el=document.createElement('div'); el.style.marginBottom='6px'; el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,#fff,#fbfdff);padding:8px;border-radius:8px"><div>${esc(d)}</div><div><button class="btn" data-type="edit-depot" data-i="${i}">Edit</button> <button class="btn" data-type="del-depot" data-i="${i}">Delete</button></div></div>`; depotListEl.appendChild(el); });
-  const schemeListEl = document.getElementById('schemeList'); schemeListEl.innerHTML='';
-  dataLists.schemes.forEach((s,i)=>{ const el=document.createElement('div'); el.style.marginBottom='6px'; el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,#fff,#fbfdff);padding:8px;border-radius:8px"><div>${esc(s)}</div><div><button class="btn" data-type="edit-scheme" data-i="${i}">Edit</button> <button class="btn" data-type="del-scheme" data-i="${i}">Delete</button></div></div>`; schemeListEl.appendChild(el); });
+  try {
+    if (!dataLists || typeof dataLists !== 'object') dataLists = { depots: [], schemes: [] };
+    if (!Array.isArray(dataLists.depots)) dataLists.depots = [];
+    if (!Array.isArray(dataLists.schemes)) dataLists.schemes = [];
+
+    const depotListEl = document.getElementById('depotList'); depotListEl.innerHTML='';
+    dataLists.depots.forEach((d,i)=>{ const el=document.createElement('div'); el.style.marginBottom='6px'; el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,#fff,#fbfdff);padding:8px;border-radius:8px"><div>${esc(d)}</div><div><button class="btn" data-type="edit-depot" data-i="${i}">Edit</button> <button class="btn" data-type="del-depot" data-i="${i}">Delete</button></div></div>`; depotListEl.appendChild(el); });
+    const schemeListEl = document.getElementById('schemeList'); schemeListEl.innerHTML='';
+    dataLists.schemes.forEach((s,i)=>{ const el=document.createElement('div'); el.style.marginBottom='6px'; el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,#fff,#fbfdff);padding:8px;border-radius:8px"><div>${esc(s)}</div><div><button class="btn" data-type="edit-scheme" data-i="${i}">Edit</button> <button class="btn" data-type="del-scheme" data-i="${i}">Delete</button></div></div>`; schemeListEl.appendChild(el); });
+  } catch(e){
+    errorLog('renderDataLists failed: ' + (e && e.message ? e.message : String(e)));
+  }
 }
 
-document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newDepot').value); if(!v) return alert('Type depot name'); if(!dataLists.depots.includes(v)) dataLists.depots.push(v); document.getElementById('newDepot').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
-document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
+document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newDepot').value); if(!v) return alert('Type depot name'); if(!Array.isArray(dataLists.depots)) dataLists.depots = []; if(!dataLists.depots.includes(v)) dataLists.depots.push(v); document.getElementById('newDepot').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
+document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!Array.isArray(dataLists.schemes)) dataLists.schemes = []; if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 
 document.addEventListener('click', (e)=>{
-  const t = e.target;
-  if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
-  if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
-  if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
-  if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
-  if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
-  if (t.classList && t.classList.contains('edit-alloc')){ const i = Number(t.dataset.i); const a = allocations[i]; const newAlloc = prompt('Edit allocated qty (6 decimals)', fmt(a.allocated)); if (newAlloc !== null){ const v = toFixed6Number(newAlloc); allocations[i].allocated = v; if (toNumber(allocations[i].issued) > toNumber(allocations[i].allocated)) allocations[i].issued = toFixed6Number(allocations[i].allocated); if (allocations[i].issued === 0) allocations[i].remarks = ''; else if (toNumber(allocations[i].issued) >= toNumber(allocations[i].allocated)) allocations[i].remarks = 'RO Completed'; else allocations[i].remarks = 'Partially used'; saveAllocations(); renderAllocTable(); renderReport(); } }
+  try {
+    const t = e.target;
+    if (!t) return;
+    if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; if (Array.isArray(dataLists.depots)) dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+    if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; if (Array.isArray(dataLists.schemes)) dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
+    if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
+    if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
+    if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
+    if (t.classList && t.classList.contains('edit-alloc')){ const i = Number(t.dataset.i); const a = allocations[i]; const newAlloc = prompt('Edit allocated qty (6 decimals)', fmt(a.allocated)); if (newAlloc !== null){ const v = toFixed6Number(newAlloc); allocations[i].allocated = v; if (toNumber(allocations[i].issued) > toNumber(allocations[i].allocated)) allocations[i].issued = toFixed6Number(allocations[i].allocated); if (allocations[i].issued === 0) allocations[i].remarks = ''; else if (toNumber(allocations[i].issued) >= toNumber(allocations[i].allocated)) allocations[i].remarks = 'RO Completed'; else allocations[i].remarks = 'Partially used'; saveAllocations(); renderAllocTable(); renderReport(); } }
+  } catch (er){ errorLog('UI event handler error: ' + (er && er.message ? er.message : String(er))); }
 });
 
 document.getElementById('addAllocBtn').addEventListener('click', ()=> {
-  const depot = document.getElementById('depotSelect').value;
-  const scheme = document.getElementById('schemeSelect').value;
-  const commodity = document.getElementById('commoditySelect').value;
-  const ro = document.getElementById('roInput').value.trim();
-  const qtyRaw = document.getElementById('qtyInput').value;
-  const qty = toFixed6Number(qtyRaw);
-  if (!depot) return alert('Select depot from Data tab first');
-  if (!scheme) return alert('Select scheme from Data tab first');
-  if (isNaN(qty) || qty < 0) return alert('Enter valid Qty (>= 0)');
-  allocations.push({ depot, scheme, commodity, ro, allocated: qty, issued: toFixed6Number(0), lastIssued: '', remarks: '' });
-  saveAllocations();
-  renderAllocTable();
-  renderReport();
-  document.getElementById('roInput').value = '';
-  document.getElementById('qtyInput').value = '';
+  try {
+    const depot = document.getElementById('depotSelect').value;
+    const scheme = document.getElementById('schemeSelect').value;
+    const commodity = document.getElementById('commoditySelect').value;
+    const ro = document.getElementById('roInput').value.trim();
+    const qtyRaw = document.getElementById('qtyInput').value;
+    const qty = toFixed6Number(qtyRaw);
+    if (!depot) return alert('Select depot from Data tab first');
+    if (!scheme) return alert('Select scheme from Data tab first');
+    if (isNaN(qty) || qty < 0) return alert('Enter valid Qty (>= 0)');
+    allocations.push({ depot, scheme, commodity, ro, allocated: qty, issued: toFixed6Number(0), lastIssued: '', remarks: '' });
+    saveAllocations();
+    renderAllocTable();
+    renderReport();
+    document.getElementById('roInput').value = '';
+    document.getElementById('qtyInput').value = '';
+  } catch(e){ errorLog('addAlloc error: ' + (e && e.message ? e.message : String(e))); }
 });
 
 function renderAllocTable(){
-  loadAllocations();
-  const tbody = document.querySelector('#allocTable tbody'); tbody.innerHTML = '';
-  allocations.forEach((a,i)=>{
-    const balance = toFixed6Number(toNumber(a.allocated) - toNumber(a.issued));
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${esc(a.depot)}</td><td>${esc(a.scheme)}</td><td>${esc(a.commodity)}</td><td>${esc(a.ro)}</td><td>${fmt(a.allocated)}</td><td>${fmt(a.issued)}</td><td>${fmt(balance)}</td><td>${a.lastIssued?new Date(a.lastIssued).toLocaleString():'-'}</td><td>${esc(a.remarks||'')}</td><td><button class="btn edit-alloc" data-i="${i}">Edit</button> <button class="btn del-alloc" data-i="${i}">Delete</button></td>`;
-    tbody.appendChild(tr);
-  });
+  try {
+    loadAllocations();
+    const tbody = document.querySelector('#allocTable tbody'); tbody.innerHTML = '';
+    allocations.forEach((a,i)=>{
+      const balance = toFixed6Number(toNumber(a.allocated) - toNumber(a.issued));
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i+1}</td><td>${esc(a.depot)}</td><td>${esc(a.scheme)}</td><td>${esc(a.commodity)}</td><td>${esc(a.ro)}</td><td>${fmt(a.allocated)}</td><td>${fmt(a.issued)}</td><td>${fmt(balance)}</td><td>${a.lastIssued?new Date(a.lastIssued).toLocaleString():'-'}</td><td>${esc(a.remarks||'')}</td><td><button class="btn edit-alloc" data-i="${i}">Edit</button> <button class="btn del-alloc" data-i="${i}">Delete</button></td>`;
+      tbody.appendChild(tr);
+    });
+  } catch(e){ errorLog('renderAllocTable failed: ' + (e && e.message ? e.message : String(e))); }
 }
 
 function renderFlagged(){
-  const area = document.getElementById('flaggedArea'); area.innerHTML = '';
-  if (!lastFlagged || lastFlagged.length === 0){ area.innerHTML = '<div class="small">No flagged transactions.</div>'; return; }
-  let html = '<table><thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>Issued</th><th>Leftover</th><th>Reason</th></tr></thead><tbody>';
-  lastFlagged.forEach((f,i)=>{ html += `<tr><td>${i+1}</td><td>${esc(f.depot)}</td><td>${esc(f.scheme)}</td><td>${esc(f.commodity||'')}</td><td>${fmt(f.issued_amount)}</td><td>${f.leftover?fmt(f.leftover):''}</td><td>${esc(f.reason)}</td></tr>`; });
-  html += '</tbody></table>';
-  area.innerHTML = html;
+  try {
+    const area = document.getElementById('flaggedArea'); area.innerHTML = '';
+    if (!lastFlagged || lastFlagged.length === 0){ area.innerHTML = '<div class="small">No flagged transactions.</div>'; return; }
+    let html = '<table><thead><tr><th>#</th><th>Depot</th><th>Scheme</th><th>Commodity</th><th>Issued</th><th>Leftover</th><th>Reason</th></tr></thead><tbody>';
+    lastFlagged.forEach((f,i)=>{ html += `<tr><td>${i+1}</td><td>${esc(f.depot)}</td><td>${esc(f.scheme)}</td><td>${esc(f.commodity||'')}</td><td>${fmt(f.issued_amount)}</td><td>${f.leftover?fmt(f.leftover):''}</td><td>${esc(f.reason)}</td></tr>`; });
+    html += '</tbody></table>';
+    area.innerHTML = html;
+  } catch(e){ errorLog('renderFlagged failed: ' + (e && e.message ? e.message : String(e))); }
 }
 
 function renderReport(){
-  const tbody = document.querySelector('#reportTable tbody'); tbody.innerHTML = '';
-  const map = {};
-  allocations.forEach(a=>{
-    const key = `${a.depot}||${a.scheme}||${a.ro}`;
-    if (!map[key]) map[key] = { depot:a.depot, scheme:a.scheme, ro:a.ro, allocated:0, issued:0, lastIssued: a.lastIssued || '' , commodity: a.commodity || ''};
-    map[key].allocated = toFixed6Number(map[key].allocated + toNumber(a.allocated));
-    map[key].issued = toFixed6Number(map[key].issued + toNumber(a.issued));
-    if (a.lastIssued) map[key].lastIssued = a.lastIssued;
-  });
-  Object.keys(map).forEach((k,i)=>{ const r = map[k]; const bal = toFixed6Number(toNumber(r.allocated) - toNumber(r.issued)); const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${esc(r.depot)}</td><td>${esc(r.scheme)}</td><td>${esc(r.ro)}</td><td>${fmt(r.allocated)}</td><td>${fmt(r.issued)}</td><td>${fmt(bal)}</td><td>${r.lastIssued?new Date(r.lastIssued).toLocaleString():'-'}</td>`; tbody.appendChild(tr); });
+  try {
+    const tbody = document.querySelector('#reportTable tbody'); tbody.innerHTML = '';
+    const map = {};
+    allocations.forEach(a=>{
+      const key = `${a.depot}||${a.scheme}||${a.ro}`;
+      if (!map[key]) map[key] = { depot:a.depot, scheme:a.scheme, ro:a.ro, allocated:0, issued:0, lastIssued: a.lastIssued || '' , commodity: a.commodity || ''};
+      map[key].allocated = toFixed6Number(map[key].allocated + toNumber(a.allocated));
+      map[key].issued = toFixed6Number(map[key].issued + toNumber(a.issued));
+      if (a.lastIssued) map[key].lastIssued = a.lastIssued;
+    });
+    Object.keys(map).forEach((k,i)=>{ const r = map[k]; const bal = toFixed6Number(toNumber(r.allocated) - toNumber(r.issued)); const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${esc(r.depot)}</td><td>${esc(r.scheme)}</td><td>${esc(r.ro)}</td><td>${fmt(r.allocated)}</td><td>${fmt(r.issued)}</td><td>${fmt(bal)}</td><td>${r.lastIssued?new Date(r.lastIssued).toLocaleString():'-'}</td>`; tbody.appendChild(tr); });
+  } catch(e){ errorLog('renderReport failed: ' + (e && e.message ? e.message : String(e))); }
 }
 
 /* ---------- Downloads ---------- */
@@ -601,7 +665,7 @@ document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!
 
 /* ---------- Init ---------- */
 loadDataLists(); loadAllocations(); populateSelects(); renderDataLists(); renderAllocTable(); renderReport();
-log('App initialized (local-only).');
+log('App initialized (local-only, defensive fixes applied).');
 
 /* ---------- Tabs wiring ---------- */
 document.querySelectorAll('.tab').forEach(btn => {
@@ -619,7 +683,6 @@ document.querySelectorAll('.tab').forEach(btn => {
 document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
 document.querySelector('[data-tab="alloc"]').classList.add('active');
 document.getElementById('alloc').style.display = 'block';
-
 </script>
 </body>
 </html>
