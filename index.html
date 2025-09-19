@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Depot Scheme Validator — Live (Draft 3)</title>
+<title>Depot Scheme Validator — Live (Auto Connect)</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -233,13 +233,14 @@
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-<!-- Firebase compat SDK (Realtime Database) - only used if user pastes config & connects -->
+<!-- Firebase compat SDK (Realtime Database + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
 <script>
 /* ========== Draft 3 — App State & Storage (Updated for portable local file) ========== */
-/* original file used as base: index.html uploaded by you. See uploaded copy. :contentReference[oaicite:1]{index=1} */
+/* original file used as base: index.html uploaded by you. See uploaded copy. :contentReference[oaicite:0]{index=0} */
 
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
@@ -256,6 +257,67 @@ let autoSync = false;
 let localFileHandle = null;     // file handle (if user permitted)
 let autoFileSave = false;       // boolean flag
 let lastKnownFileName = '';     // name for UI status
+
+/* ---------------- AUTO-CONNECT FIREBASE CONFIG ---------------- */
+/* Replace fields if you want a different project; this is your project's config */
+const HARDCODED_FIREBASE_CONFIG = {
+  "apiKey": "AIzaSyCT3J5gDSTYROpuRlWXdzkGpgMUF6iToWk",
+  "authDomain": "depot-scheme-validator.firebaseapp.com",
+  "databaseURL": "https://depot-scheme-validator-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "projectId": "depot-scheme-validator",
+  "storageBucket": "depot-scheme-validator.appspot.com",
+  "messagingSenderId": "921091665776",
+  "appId": "1:921091665776:web:8bc36484c7875c4cce29b5",
+  "measurementId": "G-D2GZZZB16C"
+};
+
+async function initFirebaseAuto(cfg) {
+  try {
+    // initialize if not already
+    try {
+      firebaseApp = firebaseApp || firebase.initializeApp(cfg);
+    } catch (e) {
+      if (!firebaseApp) firebaseApp = firebase.app();
+    }
+    firebaseDb = firebase.database();
+
+    // sign in anonymously so DB rules requiring auth will allow access
+    if (firebase.auth) {
+      try {
+        await firebase.auth().signInAnonymously();
+        console.log('Signed in anonymously');
+      } catch (err) {
+        console.warn('Anonymous sign-in failed:', err);
+      }
+    }
+
+    firebaseConnected = true;
+    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (auto)';
+
+    const pb = document.getElementById('pushFirebase');
+    const pl = document.getElementById('pullFirebase');
+    if (pb) pb.disabled = false;
+    if (pl) pl.disabled = false;
+
+    // enable autoSync by default
+    const autoSyncEl = document.getElementById('autoSync');
+    if (autoSyncEl) {
+      autoSyncEl.checked = true;
+      autoSync = true;
+    }
+  } catch (err) {
+    console.error('Auto init failed:', err);
+    document.getElementById('firebaseStatus').innerText = 'Auto-connect failed: ' + (err && err.message ? err.message : err);
+  }
+}
+
+// call auto-init on page load
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    initFirebaseAuto(HARDCODED_FIREBASE_CONFIG);
+  }, 300);
+});
+/* ---------------- END AUTO-CONNECT ---------------- */
 
 /* ========== Helpers ========== */
 function toFixed6Number(v){
