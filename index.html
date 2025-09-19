@@ -53,6 +53,8 @@
   .live-card{margin-top:12px;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(6,182,212,0.06),rgba(124,77,255,0.03));border:1px solid rgba(6,182,212,0.06)}
   .muted-note{color:#0b2b34;font-size:13px;opacity:0.9}
   .chip{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(11,17,26,0.04);font-size:13px}
+  .file-controls{display:flex;gap:8px;align-items:center;margin-top:10px}
+  .status-inline{font-size:13px;color:#0b2b34;margin-left:8px}
 </style>
 </head>
 <body>
@@ -60,7 +62,7 @@
   <header>
     <div>
       <h1>Depot Scheme Validator — Live (Draft 3)</h1>
-      <div class="sub">Gowtham Projects · Modern UI · 6-decimal precision · optional Firebase live sync</div>
+      <div class="sub">Gowtham Projects · Modern UI · 6-decimal precision · portable local JSON support</div>
     </div>
     <div class="small">Client-only · Offline/Online</div>
   </header>
@@ -96,7 +98,45 @@
       </div>
     </div>
 
-  
+    <div class="live-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <strong>Go Live (Free)</strong><br>
+          <div class="small" style="margin-top:6px">Host this file on GitHub Pages (static) and use Firebase Realtime Database for online storage (free Spark tier).</div>
+        </div>
+        <div class="chip">Free options: GitHub Pages + Firebase</div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="small muted-note">Paste Firebase config below (from Firebase Console → Project Settings → SDK) then <strong>Connect</strong>. After connecting you can Push your local data or Pull from Firebase. Toggle "Auto sync" to push on change.</div>
+        <textarea id="firebaseConfig" placeholder='Paste your Firebase config JSON here (eg {"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...", ...})'></textarea>
+        <div style="margin-top:8px" class="flex">
+          <button id="connectFirebase" class="btn primary">Connect</button>
+          <button id="pushFirebase" class="btn" disabled>Push to Firebase</button>
+          <button id="pullFirebase" class="btn" disabled>Pull from Firebase</button>
+          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoSync" type="checkbox" /> Auto sync on change</label>
+        </div>
+        <div id="firebaseStatus" class="small" style="margin-top:8px"></div>
+      </div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid rgba(11,17,26,0.04)" />
+
+      <div>
+        <strong>Portable Local JSON (recommended)</strong>
+        <div class="small" style="margin-top:6px">Save and load data to a local JSON file (works best in Chromium browsers). Use this to make the folder portable: save a <code>depot_data.json</code> beside the app and copy it to another system.</div>
+
+        <div class="file-controls">
+          <button id="saveToFileBtn" class="btn primary">Save to local file</button>
+          <button id="loadFromFileBtn" class="btn">Load from local file</button>
+          <button id="exportBtn" class="btn">Download JSON</button>
+          <input id="importFile" type="file" accept=".json" style="display:none"/>
+          <label style="margin-left:auto;display:flex;align-items:center;gap:8px"><input id="autoFileSave" type="checkbox" /> Auto save to file</label>
+        </div>
+        <div id="fileStatus" class="status-inline">No file selected.</div>
+        <div class="small" style="margin-top:8px">Note: if browser doesn't support direct filesystem writes, Save will download the JSON instead.</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ALLOCATIONS TAB -->
   <div id="alloc" class="card tabpanel" role="tabpanel">
@@ -198,11 +238,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
 <script>
-/* ========== Draft 3 — App State & Storage ========== */
+/* ========== Draft 3 — App State & Storage (Updated for portable local file) ========== */
+/* original file used as base: index.html uploaded by you. See uploaded copy. :contentReference[oaicite:1]{index=1} */
+
 const DATA_KEY = 'depot_data_lists_vfs';
 const ALLOC_KEY = 'depot_allocations_vfs';
 let dataLists = {depots:[], schemes:[]};
-let allocations = []; // each object { depot, scheme, commodity, ro, allocated (Number with 6 dp), issued (Number 6 dp), lastIssued, remarks }
+let allocations = [];
 let lastFlagged = [];
 
 let firebaseApp = null;
@@ -210,17 +252,10 @@ let firebaseDb = null;
 let firebaseConnected = false;
 let autoSync = false;
 
-/* ---------- EMBEDDED FIREBASE CONFIG (your config) ---------- */
-const firebaseConfig = {
-  apiKey: "AIzaSyDWUxXKXzV84bpyoxWPNp8ESltIrAZMjm4",
-  authDomain: "depot-validator-live.firebaseapp.com",
-  databaseURL: "https://depot-validator-live-default-rtdb.firebaseio.com",
-  projectId: "depot-validator-live",
-  storageBucket: "depot-validator-live.firebasestorage.app",
-  messagingSenderId: "1074593440181",
-  appId: "1:1074593440181:web:c3b2a9583ec1de0d3379fc",
-  measurementId: "G-Q8ES3YS02E"
-};
+/* New: local file handle and auto-file-save flag (File System Access API) */
+let localFileHandle = null;     // file handle (if user permitted)
+let autoFileSave = false;       // boolean flag
+let lastKnownFileName = '';     // name for UI status
 
 /* ========== Helpers ========== */
 function toFixed6Number(v){
@@ -233,57 +268,16 @@ function formatQty(v){
   if (!isFinite(n)) return '0.000000';
   return n.toFixed(6);
 }
-
-/* Robust load/save to avoid malformed localStorage crashes */
-function loadDataLists(){
-  try {
-    const raw = localStorage.getItem(DATA_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    if (parsed && typeof parsed === 'object') {
-      dataLists.depots = Array.isArray(parsed.depots) ? parsed.depots : [];
-      dataLists.schemes = Array.isArray(parsed.schemes) ? parsed.schemes : [];
-    } else {
-      dataLists = { depots: [], schemes: [] };
-    }
-  } catch (err) {
-    console.warn('loadDataLists parse failed, resetting lists', err);
-    dataLists = { depots: [], schemes: [] };
-  }
-}
-function saveDataLists(){ try { localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); } catch(e){ console.error('saveDataLists failed', e); } if (firebaseConnected && autoSync) pushDataListsToFirebase(); }
-
-function loadAllocations(){
-  try {
-    const raw = localStorage.getItem(ALLOC_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed)) {
-      allocations = parsed.map(a=>({
-        depot: a.depot||'',
-        scheme: a.scheme||'',
-        commodity: a.commodity||'Rice',
-        ro: a.ro||'',
-        allocated: toFixed6Number(a.allocated||0),
-        issued: toFixed6Number(a.issued||0),
-        lastIssued: a.lastIssued||'',
-        remarks: a.remarks||''
-      }));
-    } else {
-      allocations = [];
-    }
-  } catch (err) {
-    console.warn('loadAllocations parse failed, resetting allocations', err);
-    allocations = [];
-  }
-}
-function saveAllocations(){ try { localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); } catch(e){ console.error('saveAllocations failed', e); } if (firebaseConnected && autoSync) pushAllocationsToFirebase(); }
-
+function loadDataLists(){ const raw = localStorage.getItem(DATA_KEY); dataLists = raw ? JSON.parse(raw) : {depots:[], schemes:[]}; }
+function saveDataLists(){ localStorage.setItem(DATA_KEY, JSON.stringify(dataLists)); if (firebaseConnected && autoSync) pushDataListsToFirebase(); if (autoFileSave && localFileHandle) saveToLocalFileSilent(); }
+function loadAllocations(){ const raw = localStorage.getItem(ALLOC_KEY); allocations = raw ? JSON.parse(raw) : []; allocations = allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' })); }
+function saveAllocations(){ localStorage.setItem(ALLOC_KEY, JSON.stringify(allocations)); if (firebaseConnected && autoSync) pushAllocationsToFirebase(); if (autoFileSave && localFileHandle) saveToLocalFileSilent(); }
 function normStr(s){ if (s===null||s===undefined) return ''; return String(s).replace(/\u00A0/g,' ').trim().replace(/\s+/g,' '); }
 function esc(s){ return s===undefined||s===null?'':String(s).replace(/[&<>"'`]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[m]); }
 function toNumber(v){ const n = Number(String(v || '').replace(/,/g,'').trim()); return isNaN(n) ? 0 : n; }
 
-/* ========== Parsing XLSM / wide / xml ========== */
+/* ========== File parsing & validation (unchanged) ========== */
 function colIndexToLetter(index){ let s=''; let i=index; while(i>=0){ s = String.fromCharCode((i%26)+65) + s; i = Math.floor(i/26) - 1; } return s; }
-
 function parseXlsmOfftake(wb){
   const first = wb.SheetNames[0];
   const ws = wb.Sheets[first];
@@ -434,7 +428,7 @@ function readFileToJson(file){
   });
 }
 
-/* ========== Validation: strict Depot+Scheme+Commodity matching + FIFO ========== */
+/* ========== Validation: strict Depot+Scheme+Commodity matching + FIFO (unchanged) ========== */
 function findKey(keys,cands){ const low = keys.map(k=>k.toLowerCase()); for (const c of cands){ const idx = low.indexOf(c); if (idx !== -1) return keys[idx]; } for (let i=0;i<low.length;i++){ for (const c of cands) if (low[i].includes(c)) return keys[i]; } return null; }
 
 document.getElementById('portalFile').addEventListener('change', (e)=>{ const f = e.target.files[0]; document.getElementById('portalFileName').innerText = f ? f.name : ''; });
@@ -549,25 +543,13 @@ document.getElementById('validateBtn').addEventListener('click', async ()=> {
 });
 
 /* ========== UI Render & Wiring (6 dp formatting) ========== */
-
-/* Robust populateSelects to avoid forEach on undefined */
 function populateSelects(){
-  try {
-    if (!dataLists || typeof dataLists !== 'object') dataLists = { depots: [], schemes: [] };
-    if (!Array.isArray(dataLists.depots)) dataLists.depots = [];
-    if (!Array.isArray(dataLists.schemes)) dataLists.schemes = [];
-    const depotSel = document.getElementById('depotSelect');
-    const schemeSel = document.getElementById('schemeSelect');
-    if (!depotSel || !schemeSel) return;
-    depotSel.innerHTML = '<option value="">-- select depot --</option>';
-    schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
-    dataLists.depots.forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
-    dataLists.schemes.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
-  } catch (err) {
-    console.warn('populateSelects error', err);
-    try { document.getElementById('depotSelect').innerHTML = '<option value="">-- select depot --</option>'; } catch(e){}
-    try { document.getElementById('schemeSelect').innerHTML = '<option value="">-- select scheme --</option>'; } catch(e){}
-  }
+  const depotSel = document.getElementById('depotSelect');
+  const schemeSel = document.getElementById('schemeSelect');
+  depotSel.innerHTML = '<option value="">-- select depot --</option>';
+  schemeSel.innerHTML = '<option value="">-- select scheme --</option>';
+  dataLists.depots.forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; depotSel.appendChild(o); });
+  dataLists.schemes.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; schemeSel.appendChild(o); });
 }
 
 function renderDataLists(){
@@ -588,14 +570,13 @@ function renderDataLists(){
 document.getElementById('addDepotBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newDepot').value); if(!v) return alert('Type depot name'); if(!dataLists.depots.includes(v)) dataLists.depots.push(v); document.getElementById('newDepot').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 document.getElementById('addSchemeBtn').addEventListener('click', ()=>{ const v=normStr(document.getElementById('newScheme').value); if(!v) return alert('Type scheme name'); if(!dataLists.schemes.includes(v)) dataLists.schemes.push(v); document.getElementById('newScheme').value=''; saveDataLists(); renderDataLists(); populateSelects(); });
 
-document.addEventListener('click', (e)=>{
+document.addEventListener('click', (e)=>{ 
   const t = e.target;
   if (t.dataset && t.dataset.type === 'del-depot'){ const i = Number(t.dataset.i); if (!confirm('Delete depot?')) return; dataLists.depots.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
   if (t.dataset && t.dataset.type === 'del-scheme'){ const i = Number(t.dataset.i); if (!confirm('Delete scheme?')) return; dataLists.schemes.splice(i,1); saveDataLists(); renderDataLists(); populateSelects(); }
   if (t.dataset && t.dataset.type === 'edit-depot'){ const i = Number(t.dataset.i); const v = prompt('Edit depot name', dataLists.depots[i]); if (v!==null){ dataLists.depots[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
   if (t.dataset && t.dataset.type === 'edit-scheme'){ const i = Number(t.dataset.i); const v = prompt('Edit scheme name', dataLists.schemes[i]); if (v!==null){ dataLists.schemes[i] = normStr(v); saveDataLists(); renderDataLists(); populateSelects(); } }
 
-  // allocation actions: delete/edit
   if (t.classList && t.classList.contains('del-alloc')){ const i = Number(t.dataset.i); if (!confirm('Delete allocation?')) return; allocations.splice(i,1); saveAllocations(); renderAllocTable(); renderReport(); }
   if (t.classList && t.classList.contains('edit-alloc')){
     const i = Number(t.dataset.i);
@@ -673,58 +654,192 @@ function downloadXlsx(name,json){
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
 }
 document.getElementById('downloadReport').addEventListener('click', ()=>{ const map = {}; allocations.forEach(a=>{ const k = `${a.depot}||${a.scheme}||${a.ro}`; if (!map[k]) map[k] = { depot:a.depot, scheme:a.scheme, ro:a.ro, commodity:a.commodity||'', allocated:0, issued:0, lastIssued:a.lastIssued||'' }; map[k].allocated = toFixed6Number(toNumber(map[k].allocated) + toNumber(a.allocated)); map[k].issued = toFixed6Number(toNumber(map[k].issued) + toNumber(a.issued)); }); const arr = Object.keys(map).map(k=>{ const r = map[k]; return { depot: r.depot, scheme: r.scheme, ro: r.ro, commodity: r.commodity, allocated: formatQty(r.allocated), issued: formatQty(r.issued), balance: formatQty(toFixed6Number(toNumber(r.allocated)-toNumber(r.issued))), lastIssued: r.lastIssued }; }); downloadXlsx('depot_scheme_report.xlsx', arr); });
-document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason })); downloadXlsx('flagged_transactions.xlsx', arr); });
+document.getElementById('downloadFlagged').addEventListener('click', ()=>{ if (!lastFlagged || lastFlagged.length === 0) return alert('No flagged'); const arr = lastFlagged.map(f => ({ depot: f.depot, scheme: f.scheme, commodity: f.commodity || '', issued: formatQty(f.issued_amount), leftover: f.leftover ? formatQty(f.leftover) : '', reason: f.reason })); downloadXlsx('flagged_transactions.xlsx', arr);
+});
 
-/* ========== Firebase Live Sync (optional) ========== */
-/* Auto-fill textarea and auto-init firebase using embedded config, but keep UI buttons */
-function initFirebaseWithConfig(cfg){
+/* ========== Local JSON file portability helpers ========== */
+
+/* Compose the full snapshot to save */
+function composeSnapshot(){
+  return {
+    meta: { generatedAt: new Date().toISOString(), version: 'depot-validator-v1' },
+    dataLists,
+    allocations
+  };
+}
+
+/* Try to save to file using File System Access API (save file handle must be present) */
+async function saveToLocalFileSilent(){
+  if (!localFileHandle) return;
   try {
-    if (!cfg || typeof cfg !== 'object') throw new Error('Invalid config');
-    // init compat app
-    firebaseApp = firebase.initializeApp(cfg);
-    firebaseDb = firebase.database();
-    firebaseConnected = true;
-    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (Realtime DB).';
-    document.getElementById('pushFirebase').disabled = false;
-    document.getElementById('pullFirebase').disabled = false;
+    // create writable and write
+    const writable = await localFileHandle.createWritable();
+    const snapshot = composeSnapshot();
+    await writable.write(JSON.stringify(snapshot, null, 2));
+    await writable.close();
+    document.getElementById('fileStatus').innerText = `Saved to ${lastKnownFileName || 'chosen file'}`;
   } catch (err) {
-    firebaseConnected = false;
-    document.getElementById('firebaseStatus').innerText = 'Firebase init failed: ' + (err && err.message ? err.message : err);
-    console.error('firebase init error', err);
+    console.error('Save to local file failed:', err);
+    document.getElementById('fileStatus').innerText = `Save failed: ${err.message || err}`;
   }
 }
 
-// prefill textarea with embedded config for convenience
-try { document.getElementById('firebaseConfig').value = JSON.stringify(EMBEDDED_FIREBASE_CONFIG, null, 2); } catch(e){}
+/* Save to file but prompt if handle not present (Save button action) */
+async function saveToLocalFilePrompt(){
+  // If browser supports showSaveFilePicker, ask user to choose a file (prefer same folder)
+  if (window.showSaveFilePicker) {
+    try {
+      const opts = {
+        suggestedName: 'depot_data.json',
+        types: [{
+          description: 'JSON file',
+          accept: {'application/json': ['.json']}
+        }]
+      };
+      localFileHandle = await window.showSaveFilePicker(opts);
+      lastKnownFileName = localFileHandle.name || 'depot_data.json';
+      document.getElementById('fileStatus').innerText = `Selected: ${lastKnownFileName}`;
+      // save now
+      await saveToLocalFileSilent();
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('save prompt error', err);
+      document.getElementById('fileStatus').innerText = `Save cancelled or failed.`;
+      return;
+    }
+  }
 
-/* attempt auto-init on load using the embedded config */
-try {
-  initFirebaseWithConfig(EMBEDDED_FIREBASE_CONFIG);
-} catch(e){
-  console.warn('auto-init firebase failed', e);
+  // Fallback: download as JSON
+  const snapshot = composeSnapshot();
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'depot_data.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
+  document.getElementById('fileStatus').innerText = 'Downloaded depot_data.json (fallback)';
 }
 
+/* Load from a user-picked local file via showOpenFilePicker (if supported) */
+async function loadFromLocalFilePrompt(){
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({ multiple: false, types:[{ description:'JSON', accept: {'application/json': ['.json']} }] });
+      if (!handle) return;
+      localFileHandle = handle;
+      lastKnownFileName = handle.name || 'depot_data.json';
+      await loadFromHandle(handle);
+      document.getElementById('fileStatus').innerText = `Loaded: ${lastKnownFileName}`;
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('open file error', err);
+      document.getElementById('fileStatus').innerText = `Load cancelled or failed.`;
+      return;
+    }
+  }
+
+  // Fallback: open file input control
+  document.getElementById('importFile').click();
+}
+
+/* Read the file handle and import snapshot */
+async function loadFromHandle(handle){
+  try {
+    const file = await handle.getFile();
+    const txt = await file.text();
+    const snap = JSON.parse(txt);
+    if (!snap) throw new Error('Invalid snapshot');
+    if (snap.dataLists) dataLists = snap.dataLists;
+    if (snap.allocations) allocations = snap.allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' }));
+    // persist to localStorage and re-render
+    saveDataLists();
+    saveAllocations();
+    renderDataLists(); populateSelects(); renderAllocTable(); renderReport();
+  } catch (err) {
+    console.error('load from handle failed', err);
+    alert('Failed to load JSON: ' + (err.message || err));
+  }
+}
+
+/* Import via file input (fallback) */
+document.getElementById('importFile').addEventListener('change', async (e)=>{
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const txt = await f.text();
+    const snap = JSON.parse(txt);
+    if (snap.dataLists) dataLists = snap.dataLists;
+    if (snap.allocations) allocations = snap.allocations.map(a=>({ depot:a.depot||'', scheme:a.scheme||'', commodity:a.commodity||'Rice', ro:a.ro||'', allocated:toFixed6Number(a.allocated||0), issued:toFixed6Number(a.issued||0), lastIssued:a.lastIssued||'', remarks:a.remarks||'' }));
+    saveDataLists(); saveAllocations();
+    renderDataLists(); populateSelects(); renderAllocTable(); renderReport();
+    document.getElementById('fileStatus').innerText = `Imported ${f.name}`;
+  } catch (err) {
+    console.error('import failed', err);
+    alert('Import failed: ' + (err.message || err));
+  } finally {
+    e.target.value = '';
+  }
+});
+
+/* Export (download) current snapshot as JSON */
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const snap = composeSnapshot();
+  const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'depot_data.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 2000);
+  document.getElementById('fileStatus').innerText = 'Downloaded depot_data.json';
+});
+
+/* Wire Save / Load buttons and auto-save checkbox */
+document.getElementById('saveToFileBtn').addEventListener('click', async ()=> {
+  await saveToLocalFilePrompt();
+});
+
+document.getElementById('loadFromFileBtn').addEventListener('click', async ()=> {
+  await loadFromLocalFilePrompt();
+});
+
+document.getElementById('autoFileSave').addEventListener('change', (e)=>{
+  autoFileSave = e.target.checked;
+  document.getElementById('fileStatus').innerText = autoFileSave ? `Auto-save enabled${lastKnownFileName ? ' ('+lastKnownFileName+')' : ''}` : 'Auto-save disabled';
+  // Immediately save once if enabling auto-save and we have a handle
+  if (autoFileSave && localFileHandle) saveToLocalFileSilent();
+});
+
+/* If user selected a file through file input we may want to attempt saving to it later - note: input fallback does not set handle */
+
+/* ========== Firebase Live Sync (optional) ========== */
 document.getElementById('connectFirebase').addEventListener('click', ()=> {
   const txt = document.getElementById('firebaseConfig').value.trim();
   if (!txt) return alert('Paste your Firebase config JSON first (from Project Settings).');
   let cfg;
   try { cfg = JSON.parse(txt); } catch(e){ return alert('Invalid JSON'); }
   try {
-    // if an app already exists, try to delete (compat doesn't expose delete easily, so skip)
-    initFirebaseWithConfig(cfg);
+    if (firebaseApp) firebaseApp.delete && firebaseApp.delete();
+  } catch(_) {}
+  try {
+    firebaseApp = firebase.initializeApp(cfg);
+    firebaseDb = firebase.database();
+    firebaseConnected = true;
+    document.getElementById('firebaseStatus').innerText = 'Connected to Firebase (Realtime DB).';
+    document.getElementById('pushFirebase').disabled = false;
+    document.getElementById('pullFirebase').disabled = false;
   } catch(err){
+    firebaseConnected = false;
     document.getElementById('firebaseStatus').innerText = 'Firebase init failed: ' + (err.message || err);
   }
 });
 
 document.getElementById('pushFirebase').addEventListener('click', ()=> {
-  if (!firebaseConnected || !firebaseDb) return alert('Connect Firebase first.');
+  if (!firebaseConnected) return alert('Connect Firebase first.');
   pushDataListsToFirebase();
   pushAllocationsToFirebase();
 });
 
 document.getElementById('pullFirebase').addEventListener('click', ()=> {
-  if (!firebaseConnected || !firebaseDb) return alert('Connect Firebase first.');
+  if (!firebaseConnected) return alert('Connect Firebase first.');
   pullFromFirebase();
 });
 
@@ -774,5 +889,3 @@ document.getElementById('alloc').style.display = 'block';
 </script>
 </body>
 </html>
-
-
